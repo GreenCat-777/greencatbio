@@ -120,7 +120,7 @@ If you need to reach out to me, or think I could be a valuable collaborator on y
       {showIntro && (
         <div className="font-mono text-[#0ed145] animate-[fadeIn_0.5s_ease-in]">
           <div className="border-2 border-[#0ed145] p-6 rounded-lg bg-black/50 shadow-[0_0_20px_rgba(14,209,69,0.3)]">
-            <div className="mb-4 text-sm opacity-70">greencat777@bio:~$</div>
+            <div className="mb-4 text-sm opacity-70">greencat777@bio:~$ cat information.txt</div>
             <div className="text-base leading-relaxed whitespace-pre-wrap">
               {renderBioWithLinks(displayedText)}
               {!isTypingComplete && showCursor && (
