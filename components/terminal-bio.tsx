@@ -131,18 +131,12 @@ If you need to reach out to me, or think I could be a valuable collaborator on y
             {isTypingComplete && (
               <div className="flex flex-wrap gap-4 justify-center pt-6 mt-6 border-t border-[#0ed145]/30">
                 <a
-                  href="https://discord.com/users/902006605791494255"
+                  href="./social"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="button-glow inline-block px-6 py-3 border-2 border-[#0ed145] rounded-lg text-[#0ed145] hover:bg-[#0ed145] hover:text-black transition-all font-medium"
                 >
-                  Discord
-                </a>
-                <a
-                  href="mailto:greencat777456@gmail.com"
-                  className="button-glow inline-block px-6 py-3 border-2 border-[#0ed145] rounded-lg text-[#0ed145] hover:bg-[#0ed145] hover:text-black transition-all font-medium"
-                >
-                  Email
+                  Contact
                 </a>
                 <a
                   href="https://gc-wiki.vercel.app"
