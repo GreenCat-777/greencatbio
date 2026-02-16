@@ -1,21 +1,27 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 
 export default function SnakeGame() {
   const [gameStarted, setGameStarted] = useState(false)
   const [score, setScore] = useState(0)
   const [gameOver, setGameOver] = useState(false)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [gameKey, setGameKey] = useState(0)
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const directionRef = useRef<string | null>(null)
   const gameIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  const startGame = () => {
-    setGameStarted(true)
+  const startGame = useCallback(() => {
+    if (gameIntervalRef.current) {
+      clearInterval(gameIntervalRef.current)
+      gameIntervalRef.current = null
+    }
     setScore(0)
     setGameOver(false)
     directionRef.current = null
-  }
+    setGameKey((prev) => prev + 1)
+    setGameStarted(true)
+  }, [])
 
   useEffect(() => {
     if (!gameStarted || !canvasRef.current) return
@@ -33,6 +39,8 @@ export default function SnakeGame() {
       x: Math.floor(Math.random() * cols) * box,
       y: Math.floor(Math.random() * rows) * box,
     }
+
+    directionRef.current = null
 
     const handleKeyDown = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase()
@@ -122,39 +130,42 @@ export default function SnakeGame() {
     gameIntervalRef.current = setInterval(draw, 150)
 
     return () => {
-      if (gameIntervalRef.current) clearInterval(gameIntervalRef.current)
+      if (gameIntervalRef.current) {
+        clearInterval(gameIntervalRef.current)
+        gameIntervalRef.current = null
+      }
       document.removeEventListener("keydown", handleKeyDown)
       canvas.removeEventListener("touchstart", handleTouchStart)
       canvas.removeEventListener("touchend", handleTouchEnd)
     }
-  }, [gameStarted])
+  }, [gameStarted, gameKey])
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col items-center gap-4">
       {!gameStarted ? (
-        <button
-          onClick={startGame}
-          className="button-glow px-8 py-3 border-2 border-[#0ed145] rounded-lg text-[#0ed145] hover:bg-[#0ed145] hover:text-black transition-all font-medium cursor-pointer bg-transparent"
-        >
-          Wanna Play Snake?
-        </button>
+        <div className="flex flex-col items-center gap-4">
+          <h2 className="text-[#0ed145] font-mono text-xl glow-text">Wanna Play Snake?</h2>
+          <button
+            onClick={startGame}
+            className="px-6 py-2 rounded border border-[#0ed145] text-[#0ed145] bg-transparent font-mono text-sm button-glow hover:bg-[#0ed145]/10 transition-colors"
+          >
+            Start Game
+          </button>
+        </div>
       ) : (
         <>
-          <h2 className="text-2xl glow-text">Snake Game</h2>
-          <div className="glow-text text-lg">Score: {score}</div>
-          <canvas
-            ref={canvasRef}
-            width={300}
-            height={300}
-            className="border-2 border-[#0ed145] mx-auto shadow-[0_0_20px_rgba(14,209,69,0.3)] touch-none"
-          />
-          <p className="text-sm glow-text">Use Arrow keys, WASD, or swipe to move.</p>
+          <h2 className="text-[#0ed145] font-mono text-xl glow-text">Snake Game</h2>
+          <p className="text-[#0ed145]/80 font-mono text-sm">Score: {score}</p>
+          <canvas ref={canvasRef} width={300} height={300} className="border border-[#0ed145]/30 rounded bg-black" />
+          <p className="text-[#555] dark:text-[#d4d4d4]/60 font-mono text-xs">Use Arrow keys, WASD, or swipe to move.</p>
           {gameOver && (
-            <div className="space-y-4">
-              <p className="text-xl glow-text animate-pulse">Game Over! Final Score: {score}</p>
+            <div className="flex flex-col items-center gap-3" style={{ animation: "fadeIn 0.5s ease-out" }}>
+              <p className="text-[#0ed145] font-mono text-sm">
+                Game Over! Final Score: {score}
+              </p>
               <button
                 onClick={startGame}
-                className="button-glow px-8 py-3 border-2 border-[#0ed145] rounded-lg text-[#0ed145] hover:bg-[#0ed145] hover:text-black transition-all font-medium cursor-pointer bg-transparent"
+                className="px-6 py-2 rounded border border-[#0ed145] text-[#0ed145] bg-transparent font-mono text-sm button-glow hover:bg-[#0ed145]/10 transition-colors"
               >
                 Play Again
               </button>
