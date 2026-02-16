@@ -11,7 +11,8 @@ export default function TerminalBio() {
   const [isTypingComplete, setIsTypingComplete] = useState(false)
   const [showCursor, setShowCursor] = useState(true)
 
-  const bioText = `My Discord is soon to be removed due to the new ID policy. (Hell naw doin' that)
+  const bioText = `My Discord is soon to be removed due to the new ID policy.
+  (No Way I'm doing that)
   
   I have a Stoat it is GreenCat777#4751
   
