@@ -11,7 +11,11 @@ export default function TerminalBio() {
   const [isTypingComplete, setIsTypingComplete] = useState(false)
   const [showCursor, setShowCursor] = useState(true)
 
-  const bioText = `Discord will be removed soon. I also have a Stoat account it's GreenCat777#4751`
+  const bioText = `My Discord is soon to be removed due to the new ID policy. (Hell naw doin' that)
+  
+  I have a Stoat it is GreenCat777#4751
+  
+  Google chat on my Email is also welcome`
 
   useEffect(() => {
     const introTimer = setTimeout(() => {
@@ -62,6 +66,13 @@ export default function TerminalBio() {
     const parts: React.ReactNode[] = []
     let lastIndex = 0
 
+    const links = [
+      { text: "MIP wiki", url: "https://mip-wiki.pages.dev", index: text.indexOf("MIP wiki") },
+      { text: "KindleForge", url: "https://github.com/KindleTweaks/KindleForge", index: text.indexOf("KindleForge") },
+      { text: "kindlemodshelf", url: "https://kindlemodshelf.me", index: text.indexOf("kindlemodshelf") },
+      { text: "KMC", url: "https://discord.gg/kindle", index: text.indexOf("KMC") },
+    ]
+
     links
       .filter((link) => link.index !== -1)
       .sort((a, b) => a.index - b.index)
@@ -90,8 +101,18 @@ export default function TerminalBio() {
     <div className="w-full max-w-3xl mx-auto space-y-8">
       <div
         className={`text-center space-y-2 transition-opacity duration-1000 ${showIntro ? "opacity-100" : "opacity-0"}`}
+      >
+        <Image
+          src="/pfp.png"
+          alt="GreenCat Profile Picture"
+          width={120}
+          height={120}
+          className="rounded-full mx-auto border-2 border-[#0ed145] shadow-[0_0_20px_rgba(14,209,69,0.5)]"
+          priority
+          unoptimized
+        />
         <h1 className="text-4xl md:text-5xl font-bold glow-text">I&apos;m GreenCat777</h1>
-        <p className="text-2xl md:text-3xl glow-text">Here, is my contact info.</p>
+        <p className="text-2xl md:text-3xl glow-text">These are contact methods.</p>
       </div>
 
       {showIntro && (
@@ -108,14 +129,6 @@ export default function TerminalBio() {
             {isTypingComplete && (
               <div className="flex flex-wrap gap-4 justify-center pt-6 mt-6 border-t border-[#0ed145]/30">
                 <a
-                  href="https://discord.com/users/902006605791494255"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="button-glow inline-block px-6 py-3 border-2 border-[#0ed145] rounded-lg text-[#0ed145] hover:bg-[#0ed145] hover:text-black transition-all font-medium"
-                >
-                  Discord
-                </a>
-                <a
                   href="https://matrix.to/#/@greencat777:matrix.org"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -130,6 +143,14 @@ export default function TerminalBio() {
                   className="button-glow inline-block px-6 py-3 border-2 border-[#0ed145] rounded-lg text-[#0ed145] hover:bg-[#0ed145] hover:text-black transition-all font-medium"
                 >
                   Email
+                </a>
+                <a
+                  href="https://discord.com/users/902006605791494255"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="button-glow inline-block px-6 py-3 border-2 border-[#0ed145] rounded-lg text-[#0ed145] hover:bg-[#0ed145] hover:text-black transition-all font-medium"
+                >
+                  Discord
                 </a>
               </div>
             )}
