@@ -1,56 +1,141 @@
 "use client"
 
-import Link from "next/link"
+import type React from "react"
 
-export default function SocialClient() {
+import { useState, useEffect } from "react"
+import Image from "next/image"
+
+export default function TerminalBio() {
+  const [showIntro, setShowIntro] = useState(false)
+  const [displayedText, setDisplayedText] = useState("")
+  const [isTypingComplete, setIsTypingComplete] = useState(false)
+  const [showCursor, setShowCursor] = useState(true)
+
+  const bioText = `Discord will be removed soon. I also have a Stoat account it's GreenCat777#4751`
+
+  useEffect(() => {
+    const introTimer = setTimeout(() => {
+      setShowIntro(true)
+    }, 300)
+
+    return () => clearTimeout(introTimer)
+  }, [])
+
+  useEffect(() => {
+    if (!showIntro) return
+
+    let typeInterval: NodeJS.Timeout
+
+    const startTypingDelay = setTimeout(() => {
+      let charIndex = 0
+
+      typeInterval = setInterval(() => {
+        if (charIndex < bioText.length) {
+          setDisplayedText(bioText.slice(0, charIndex + 1))
+          charIndex++
+        } else {
+          clearInterval(typeInterval)
+          setIsTypingComplete(true)
+        }
+      }, 30) // Consistent 30ms typing speed
+    }, 800)
+
+    return () => {
+      clearTimeout(startTypingDelay)
+      if (typeInterval) clearInterval(typeInterval)
+    }
+  }, [showIntro, bioText])
+
+  useEffect(() => {
+    const cursorInterval = setInterval(() => {
+      setShowCursor((prev) => !prev)
+    }, 500)
+
+    return () => clearInterval(cursorInterval)
+  }, [])
+
+  const renderBioWithLinks = (text: string) => {
+    if (!isTypingComplete) {
+      return text
+    }
+
+    const parts: React.ReactNode[] = []
+    let lastIndex = 0
+
+    links
+      .filter((link) => link.index !== -1)
+      .sort((a, b) => a.index - b.index)
+      .forEach((link, idx) => {
+        parts.push(<span key={`text-${idx}`}>{text.substring(lastIndex, link.index)}</span>)
+        parts.push(
+          <a
+            key={`link-${idx}`}
+            href={link.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-white transition-colors"
+          >
+            {link.text}
+          </a>,
+        )
+        lastIndex = link.index + link.text.length
+      })
+
+    parts.push(<span key="text-end">{text.substring(lastIndex)}</span>)
+
+    return <>{parts}</>
+  }
+
   return (
-    <main className="min-h-screen bg-[#f5f5f5] dark:bg-[#0a0a0a] flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl rounded-lg border border-[#0ed145]/30 bg-white dark:bg-[#0d0d0d] p-6 font-mono shadow-lg shadow-[#0ed145]/5">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold text-[#0ed145] glow-text">Social</h1>
-          <Link
-            href="/"
-            className="px-4 py-2 rounded border border-[#0ed145] text-[#0ed145] bg-transparent font-mono text-sm button-glow hover:bg-[#0ed145]/10 transition-colors"
-          >
-            Home
-          </Link>
-        </div>
-
-        <p className="text-[#0ed145]/80 text-sm mb-6">
-          <span className="text-[#0ed145]">{"greencat777@bio:~$"}</span> cat socials.txt
-        </p>
-
-        <div className="flex flex-wrap gap-3 mb-8" style={{ animation: "fadeIn 0.5s ease-out" }}>
-          <a
-            href="https://matrix.to/#/@greencat777:matrix.org"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-6 py-2 rounded border border-[#0ed145] text-[#0ed145] bg-transparent font-mono text-sm button-glow hover:bg-[#0ed145]/10 transition-colors"
-          >
-            Matrix
-          </a>
-          <a
-            href="mailto:greencat777456@gmail.com"
-            className="px-6 py-2 rounded border border-[#0ed145] text-[#0ed145] bg-transparent font-mono text-sm button-glow hover:bg-[#0ed145]/10 transition-colors"
-          >
-            Email
-          </a>
-          <a
-            href="https://discord.com/users/902006605791494255"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-6 py-2 rounded border border-[#0ed145] text-[#0ed145] bg-transparent font-mono text-sm button-glow hover:bg-[#0ed145]/10 transition-colors"
-          >
-            Discord
-          </a>
-        </div>
-
-        <div className="rounded border border-[#0ed145]/20 bg-[#0ed145]/5 p-4">
-          <p className="text-[#333] dark:text-[#d4d4d4] text-sm leading-relaxed">
-            Discord is soon to be removed. I have a Stoat it is GreenCat777#4751
-          </p>
-        </div>
+    <div className="w-full max-w-3xl mx-auto space-y-8">
+      <div
+        className={`text-center space-y-2 transition-opacity duration-1000 ${showIntro ? "opacity-100" : "opacity-0"}`}
+        <h1 className="text-4xl md:text-5xl font-bold glow-text">I&apos;m GreenCat777</h1>
+        <p className="text-2xl md:text-3xl glow-text">Here, is my contact info.</p>
       </div>
-    </main>
+
+      {showIntro && (
+        <div className="font-mono text-[#0ed145] animate-[fadeIn_0.5s_ease-in]">
+          <div className="border-2 border-[#0ed145] p-6 rounded-lg bg-black/50 shadow-[0_0_20px_rgba(14,209,69,0.3)]">
+            <div className="mb-4 text-sm opacity-70">greencat777@bio:~$ cat contact.txt</div>
+            <div className="text-base leading-relaxed whitespace-pre-wrap">
+              {renderBioWithLinks(displayedText)}
+              {!isTypingComplete && showCursor && (
+                <span className="inline-block w-2 h-5 bg-[#0ed145] ml-1 align-middle" />
+              )}
+            </div>
+
+            {isTypingComplete && (
+              <div className="flex flex-wrap gap-4 justify-center pt-6 mt-6 border-t border-[#0ed145]/30">
+                <a
+                  href="https://discord.com/users/902006605791494255"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="button-glow inline-block px-6 py-3 border-2 border-[#0ed145] rounded-lg text-[#0ed145] hover:bg-[#0ed145] hover:text-black transition-all font-medium"
+                >
+                  Discord
+                </a>
+                <a
+                  href="https://matrix.to/#/@greencat777:matrix.org"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="button-glow inline-block px-6 py-3 border-2 border-[#0ed145] rounded-lg text-[#0ed145] hover:bg-[#0ed145] hover:text-black transition-all font-medium"
+                >
+                  Matrix
+                </a>
+                <a
+                  href="mailto:greencat777456@gmail.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="button-glow inline-block px-6 py-3 border-2 border-[#0ed145] rounded-lg text-[#0ed145] hover:bg-[#0ed145] hover:text-black transition-all font-medium"
+                >
+                  Email
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
