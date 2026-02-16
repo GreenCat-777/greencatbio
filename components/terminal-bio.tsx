@@ -17,7 +17,7 @@ I'm a beta tester for the MIP wiki and KindleForge. I've written pages for the M
 
 All my projects (not my documentation) are listed under The Unlicense, with no rights reserved, If you use my work credit is appreiciated, but NOT required. If you have paid for any of my work you have been legally scammed.
 
-If you need to reach out to me, or think I could be a valuable collaborator on your project, contact me from the Contact button. If you want to take a look at my work use the Github button and/or look in the KMC. I also have a wiki with proper documentation on my work.`
+If you need to reach out to me, or think I could be a valuable collaborator on your project, contact me from any of the options in the Contact button. If you want to take a look at my work use the Github button and/or look in the KMC. I also have a wiki with proper documentation on my work.`
 
   useEffect(() => {
     const introTimer = setTimeout(() => {
