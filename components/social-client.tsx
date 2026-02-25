@@ -13,11 +13,13 @@ export default function TerminalBio() {
 
   const bioText = `
   My Discord is soon to be removed due to the new ID policy.
-  (No Way I'm doing that)
-  
+No Way I'm doing that)
+
   I have a Stoat it is GreenCat777#4751
   
-  Google chat on my Email is also welcome`
+  Google chat on my Email is also welcome
+
+  FYI use Email or Reddit I check them the most.`
 
   useEffect(() => {
     const introTimer = setTimeout(() => {
@@ -131,6 +133,14 @@ export default function TerminalBio() {
             {isTypingComplete && (
               <div className="flex flex-wrap gap-4 justify-center pt-6 mt-6 border-t border-[#0ed145]/30">
                 <a
+                  href="https://reddit.com/chat/user/t2_7xj0jz7m5"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="button-glow inline-block px-6 py-3 border-2 border-[#0ed145] rounded-lg text-[#0ed145] hover:bg-[#0ed145] hover:text-black transition-all font-medium"
+                >
+                  Reddit DMs
+                </a>
+<a
                   href="https://matrix.to/#/@greencat777:matrix.org"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -139,7 +149,7 @@ export default function TerminalBio() {
                   Matrix
                 </a>
                 <a
-                  href="mailto:greencat777456@gmail.com"
+                  href="mailto:greencat777456@gmail.com https://reddit.com/chat/user/t2_7xj0jz7m5"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="button-glow inline-block px-6 py-3 border-2 border-[#0ed145] rounded-lg text-[#0ed145] hover:bg-[#0ed145] hover:text-black transition-all font-medium"
