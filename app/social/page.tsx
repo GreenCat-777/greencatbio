@@ -1,3 +1,4 @@
+import Comments from "@/components/Comments";
 import type { Metadata } from "next"
 import SocialClient from "@/components/social-client"
 
