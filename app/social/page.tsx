@@ -8,5 +8,10 @@ export const metadata: Metadata = {
 }
 
 export default function SocialPage() {
-  return <SocialClient />
+  return (
+    <>
+      <SocialClient />
+      <Comments />
+    </>
+  );
 }
