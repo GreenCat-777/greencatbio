@@ -13,9 +13,7 @@ export default function TerminalBio() {
 
   const bioText = `
   My Discord is soon to be removed due to the new ID policy.
-No Way I'm doing that)
-
-  I have a Stoat it is GreenCat777#4751
+(No Way I'm doing that)
   
   Google chat on my Email is also welcome
 
@@ -147,6 +145,14 @@ No Way I'm doing that)
                   className="button-glow inline-block px-6 py-3 border-2 border-[#0ed145] rounded-lg text-[#0ed145] hover:bg-[#0ed145] hover:text-black transition-all font-medium"
                 >
                   Matrix
+                </a>
+<a
+                  href="https://stoat.chat/qr?v2Zmb3JtYXRqcnFyJHVzZXIkMGZhdmF0YXJ4KndLRWZTNlRlMW5fakU2UUZtbVVJNmNIOV91RFNkeUVYelV5Njg4WUpfaGtkaXNwbGF5TmFtZXgaMDFKRFpSREQxWVo4NEhBOEVTVDJFNUdWWFRodXNlcm5hbWVrR3JlZW5DYXQ3NzdtZGlzY3JpbWluYXRvcmQ0NzUxYmlkeBowMUtIQ0pTS0ZYQlRTMEZZREtBVzUxWjJXOf8="
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="button-glow inline-block px-6 py-3 border-2 border-[#0ed145] rounded-lg text-[#0ed145] hover:bg-[#0ed145] hover:text-black transition-all font-medium"
+                >
+                  Stoat
                 </a>
                 <a
                   href="mailto:greencat777456@gmail.com https://reddit.com/chat/user/t2_7xj0jz7m5"
