@@ -9,9 +9,9 @@ export const metadata: Metadata = {
 
 export default function SocialPage() {
   return (
-    <>
+    <div className="w-full max-w-3xl mx-auto px-4 pb-16 space-y-10">
       <SocialClient />
       <Comments />
-    </>
+    </div>
   );
 }
