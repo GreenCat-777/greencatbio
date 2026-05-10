@@ -19,8 +19,8 @@ export default function KofiWidget() {
       window.kofiWidgetOverlay.draw("gc777", {
         type: "floating-chat",
         "floating-chat.donateButton.text": "Support me",
-        "floating-chat.donateButton.background-color": "#00b9fe",
-        "floating-chat.donateButton.text-color": "#fff",
+        "floating-chat.donateButton.background-color": "#00000",
+        "floating-chat.donateButton.text-color": "#0fe54b",
       });
     };
     document.body.appendChild(script);
