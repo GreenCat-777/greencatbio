@@ -2,14 +2,14 @@ import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { cookies } from "next/headers";
 
-function isAuthed(req: Request): boolean {
-  const cookieHeader = req.headers.get("cookie") || "";
-  const match = cookieHeader.match(/admin_session=([^;]+)/);
-  return match?.[1] === process.env.ADMIN_SECRET;
+async function isAuthed(): Promise<boolean> {
+  const cookieStore = await cookies();
+  const session = cookieStore.get("admin_session");
+  return session?.value === process.env.ADMIN_SECRET;
 }
 
-export async function GET(req: Request) {
-  if (!isAuthed(req)) {
+export async function GET() {
+  if (!(await isAuthed())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -25,7 +25,7 @@ export async function GET(req: Request) {
 }
 
 export async function PATCH(req: Request) {
-  if (!isAuthed(req)) {
+  if (!(await isAuthed())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -44,7 +44,7 @@ export async function PATCH(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  if (!isAuthed(req)) {
+  if (!(await isAuthed())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
