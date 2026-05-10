@@ -6,6 +6,7 @@ type Vouch = {
   id: string;
   name: string;
   body: string;
+  email: string;
   user_confirmed: boolean;
   admin_approved: boolean;
   created_at: string;
@@ -359,6 +360,7 @@ function Dashboard() {
                       ? <span className="ad-badge-confirmed">✓ Confirmed</span>
                       : <span className="ad-badge-unconfirmed">Unconfirmed</span>}
                   </div>
+                  <div style={{fontSize:"0.75rem", opacity:0.4, marginBottom:"8px"}}>✉ {v.email}</div>
                   <p className="ad-body">{v.body}</p>
                   <div className="ad-actions">
                     {!v.admin_approved ? (

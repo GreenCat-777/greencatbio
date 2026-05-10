@@ -146,6 +146,11 @@ export default function VouchesClient() {
             <span className="vc-count">
               {fetching ? "..." : `${vouches.length} vouch${vouches.length !== 1 ? "es" : ""}`}
             </span>
+            <a href="/" style={{marginLeft:"auto", fontSize:"0.78rem", color:"rgba(14,209,69,0.6)", textDecoration:"none", border:"1px solid rgba(14,209,69,0.3)", borderRadius:"5px", padding:"3px 12px", transition:"all 0.15s"}}
+              onMouseOver={e => { (e.target as HTMLElement).style.color="#0ed145"; (e.target as HTMLElement).style.borderColor="#0ed145"; }}
+              onMouseOut={e => { (e.target as HTMLElement).style.color="rgba(14,209,69,0.6)"; (e.target as HTMLElement).style.borderColor="rgba(14,209,69,0.3)"; }}>
+              ← home
+            </a>
           </div>
 
           {/* Submit form or success state */}
