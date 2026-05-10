@@ -2,21 +2,21 @@ import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { cookies } from "next/headers";
 
-async function isAuthed(): Promise<boolean> {
-  const cookieStore = await cookies();
-  const session = cookieStore.get("admin_session");
-  return session?.value === process.env.ADMIN_SECRET;
+function isAuthed(req: Request): boolean {
+  const cookieHeader = req.headers.get("cookie") || "";
+  const match = cookieHeader.match(/admin_session=([^;]+)/);
+  return match?.[1] === process.env.ADMIN_SECRET;
 }
 
-export async function GET() {
-  if (!(await isAuthed())) {
+export async function GET(req: Request) {
+  if (!isAuthed(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const supabase = createServerSupabase();
   const { data, error } = await supabase
     .from("vouches")
-    .select("id, name, body, user_confirmed, admin_approved, created_at")
+    .select("id, name, body, email, user_confirmed, admin_approved, created_at")
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: "DB error" }, { status: 500 });
@@ -25,7 +25,7 @@ export async function GET() {
 }
 
 export async function PATCH(req: Request) {
-  if (!(await isAuthed())) {
+  if (!isAuthed(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -44,7 +44,7 @@ export async function PATCH(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  if (!(await isAuthed())) {
+  if (!isAuthed(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
