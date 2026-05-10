@@ -10,7 +10,6 @@ export async function POST(req: Request) {
   try {
     const { name, body, email } = await req.json();
 
-    // Validate
     if (!name?.trim() || !body?.trim() || !email?.trim()) {
       return NextResponse.json({ error: "All fields are required." }, { status: 400 });
     }
@@ -22,43 +21,48 @@ export async function POST(req: Request) {
 
     const supabase = createServerSupabase();
 
-    // Insert vouch
     const { data, error } = await supabase
       .from("vouches")
       .insert([{ name: name.trim(), body: body.trim(), email: email.trim().toLowerCase() }])
       .select()
       .single();
 
-    if (error) {
+    if (error || !data) {
       console.error("Supabase insert error:", error);
       return NextResponse.json({ error: "Failed to save vouch." }, { status: 500 });
     }
 
     const siteUrl = "https://www.greencat777.xyz";
 
-    // Send confirmation email to submitter
-    await sendEmail({
-      to: email.trim().toLowerCase(),
-      subject: "Confirm your vouch on greencat777.xyz",
-      html: buildConfirmationEmail({
-        name: name.trim(),
-        body: body.trim(),
-        token: data.confirm_token,
-        siteUrl,
-      }),
-    });
+    try {
+      await sendEmail({
+        to: email.trim().toLowerCase(),
+        subject: "Confirm your vouch on greencat777.xyz",
+        html: buildConfirmationEmail({
+          name: name.trim(),
+          body: body.trim(),
+          token: data.confirm_token,
+          siteUrl,
+        }),
+      });
+    } catch (emailErr) {
+      console.error("Failed to send confirmation email:", emailErr);
+    }
 
-    // Send admin notification
-    await sendEmail({
-      to: process.env.ADMIN_EMAIL!,
-      subject: `New vouch from ${name.trim()}`,
-      html: buildAdminNotificationEmail({
-        name: name.trim(),
-        body: body.trim(),
-        vouchId: data.id,
-        siteUrl,
-      }),
-    });
+    try {
+      await sendEmail({
+        to: process.env.ADMIN_EMAIL!,
+        subject: `New vouch from ${name.trim()}`,
+        html: buildAdminNotificationEmail({
+          name: name.trim(),
+          body: body.trim(),
+          vouchId: data.id,
+          siteUrl,
+        }),
+      });
+    } catch (emailErr) {
+      console.error("Failed to send admin email:", emailErr);
+    }
 
     return NextResponse.json({ ok: true });
   } catch (err) {
