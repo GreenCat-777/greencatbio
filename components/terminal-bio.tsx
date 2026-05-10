@@ -154,6 +154,12 @@ If you need to reach out to me, or think I could be a valuable collaborator on y
                 >
                   Github
                 </a>
+                <a
+                  href="/vouches"
+                  className="button-glow inline-block px-6 py-3 border-2 border-[#0ed145] rounded-lg text-[#0ed145] hover:bg-[#0ed145] hover:text-black transition-all font-medium"
+                >
+                  Vouches
+                </a>
               </div>
             )}
           </div>
