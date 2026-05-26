@@ -155,7 +155,7 @@ export default function TerminalBio() {
                   Stoat
                 </a>
                 <a
-                  href="mailto:greencat777456@gmail.com https://reddit.com/chat/user/t2_7xj0jz7m5"
+                  href="mailto:greencat777456@gmail.com"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="button-glow inline-block px-6 py-3 border-2 border-[#0ed145] rounded-lg text-[#0ed145] hover:bg-[#0ed145] hover:text-black transition-all font-medium"
