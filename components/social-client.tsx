@@ -13,9 +13,11 @@ export default function TerminalBio() {
 
   const bioText = `
   My Discord is soon to be removed due to the new ID policy.
-(No Way I'm doing that)
+(No way I'm doing that)
   
   Google chat on my Email is also welcome
+
+  Fluxer is GreenCat777#1704
 
   FYI use Email or Reddit I check them the most.`
 
