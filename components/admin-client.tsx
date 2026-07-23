@@ -421,4 +421,61 @@ function Dashboard() {
                   </div>
 
                   <div className="ad-note-block">
-                    <p className="ad-note-label">// NOTE FROM GREENCAT (shown publ
+                    <p className="ad-note-label">// NOTE FROM GREENCAT (shown publicly on this vouch)</p>
+                    <textarea
+                      className="ad-note-input"
+                      placeholder="optional note to display under this vouch..."
+                      rows={2}
+                      value={noteValue(v)}
+                      onChange={(e) => setNoteDrafts((d) => ({ ...d, [v.id]: e.target.value }))}
+                    />
+                    <div className="ad-note-row">
+                      <button
+                        className="ad-btn ad-btn-note"
+                        onClick={() => saveNote(v.id)}
+                        disabled={!!actionLoading || noteValue(v) === (v.admin_note ?? "")}
+                      >
+                        {actionLoading === v.id + "-note" ? <><span className="ad-spinner" />saving...</> : "💾 Save note"}
+                      </button>
+                      {noteValue(v) !== (v.admin_note ?? "") && <span className="ad-note-dirty">unsaved changes</span>}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {toast && <div className="ad-toast">{toast}</div>}
+    </>
+  );
+}
+
+// ── MAIN EXPORT ─────────────────────────────────────────────────
+export default function AdminClient() {
+  const [authed, setAuthed] = useState<boolean | null>(null);
+
+  // Check if already authed via session cookie
+  useEffect(() => {
+    fetch("/api/admin/vouches")
+      .then((r) => {
+        setAuthed(r.ok);
+      })
+      .catch(() => setAuthed(false));
+  }, []);
+
+  if (authed === null) {
+    return (
+      <div style={{ fontFamily: "monospace", color: "#0ed145", textAlign: "center", padding: "2rem", opacity: 0.5 }}>
+        loading...
+      </div>
+    );
+  }
+
+  if (!authed) {
+    return <LoginScreen onLogin={() => setAuthed(true)} />;
+  }
+
+  return <Dashboard />;
+}
