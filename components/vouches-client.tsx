@@ -17,6 +17,27 @@ type Vouch = {
   created_at: string;
 };
 
+const URL_RE = /(https?:\/\/[^\s]+)/g;
+
+function linkifyNote(text: string) {
+  const parts = text.split(URL_RE);
+  return parts.map((part, i) =>
+    /^https?:\/\//.test(part) ? (
+      <a
+        key={i}
+        href={part}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ color: "#0ed145", textDecoration: "underline" }}
+      >
+        {part}
+      </a>
+    ) : (
+      part
+    )
+  );
+}
+
 function timeAgo(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
@@ -231,7 +252,7 @@ export default function VouchesClient() {
                     </div>
                     <p className="vc-body">{v.body}</p>
                     {v.admin_note && (
-                      <p className="vc-note">Note From GreenCat: {v.admin_note}</p>
+                      <p className="vc-note">Note From GreenCat: {linkifyNote(v.admin_note)}</p>
                     )}
                   </div>
                 </div>
