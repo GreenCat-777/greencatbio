@@ -9,6 +9,7 @@ type Vouch = {
   email: string;
   user_confirmed: boolean;
   admin_approved: boolean;
+  admin_note: string | null;
   created_at: string;
 };
 
@@ -174,6 +175,7 @@ function Dashboard() {
   const [filter, setFilter] = useState<"all" | "pending" | "approved">("pending");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
 
   const fetchVouches = useCallback(async () => {
     setLoading(true);
@@ -237,6 +239,26 @@ function Dashboard() {
     setActionLoading(null);
   }
 
+  function noteValue(v: Vouch) {
+    return noteDrafts[v.id] !== undefined ? noteDrafts[v.id] : (v.admin_note ?? "");
+  }
+
+  async function saveNote(id: string) {
+    const admin_note = noteDrafts[id] ?? "";
+    setActionLoading(id + "-note");
+    try {
+      await fetch("/api/admin/vouches", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, admin_note }),
+      });
+      setVouches((v) => v.map((x) => x.id === id ? { ...x, admin_note: admin_note.trim() ? admin_note.trim() : null } : x));
+      setNoteDrafts((d) => { const n = { ...d }; delete n[id]; return n; });
+      showToast("✓ Note saved.");
+    } catch { showToast("Error saving note."); }
+    setActionLoading(null);
+  }
+
   const filtered = vouches.filter((v) => {
     if (filter === "pending") return !v.admin_approved;
     if (filter === "approved") return v.admin_approved;
@@ -290,6 +312,15 @@ function Dashboard() {
     .ad-stat { border:1px solid rgba(14,209,69,0.2); border-radius:6px; padding:8px 14px; background:rgba(14,209,69,0.03); }
     .ad-stat-val { font-size:1.4rem; font-weight:bold; line-height:1; }
     .ad-stat-label { font-size:0.68rem; opacity:0.4; margin-top:2px; letter-spacing:0.06em; }
+    .ad-note-block { margin-top:10px; padding-top:10px; border-top:1px dashed rgba(14,209,69,0.15); }
+    .ad-note-label { font-size:0.7rem; opacity:0.4; letter-spacing:0.06em; margin-bottom:5px; }
+    .ad-note-input { width:100%; background:transparent; border:1px solid rgba(14,209,69,0.35); border-radius:6px; padding:0.5rem 0.75rem; color:#0ed145; font-family:monospace; font-size:0.82rem; outline:none; resize:vertical; min-height:50px; box-sizing:border-box; transition:border-color 0.15s, box-shadow 0.15s; }
+    .ad-note-input:focus { border-color:#0ed145; box-shadow:0 0 8px rgba(14,209,69,0.25); }
+    .ad-note-input::placeholder { color:rgba(14,209,69,0.3); }
+    .ad-note-row { display:flex; align-items:center; gap:0.5rem; margin-top:6px; }
+    .ad-btn-note { border-color:rgba(14,209,69,0.5); color:rgba(14,209,69,0.8); background:transparent; }
+    .ad-btn-note:hover:not(:disabled) { background:#0ed145; color:#000; border-color:#0ed145; }
+    .ad-note-dirty { font-size:0.68rem; color:rgba(255,200,0,0.75); }
   `;
 
   return (
@@ -388,42 +419,6 @@ function Dashboard() {
                       {actionLoading === v.id + "-delete" ? <><span className="ad-spinner" />deleting...</> : "✕ Delete"}
                     </button>
                   </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
 
-      {toast && <div className="ad-toast">{toast}</div>}
-    </>
-  );
-}
-
-// ── MAIN EXPORT ─────────────────────────────────────────────────
-export default function AdminClient() {
-  const [authed, setAuthed] = useState<boolean | null>(null);
-
-  // Check if already authed via session cookie
-  useEffect(() => {
-    fetch("/api/admin/vouches")
-      .then((r) => {
-        setAuthed(r.ok);
-      })
-      .catch(() => setAuthed(false));
-  }, []);
-
-  if (authed === null) {
-    return (
-      <div style={{ fontFamily: "monospace", color: "#0ed145", textAlign: "center", padding: "2rem", opacity: 0.5 }}>
-        loading...
-      </div>
-    );
-  }
-
-  if (!authed) {
-    return <LoginScreen onLogin={() => setAuthed(true)} />;
-  }
-
-  return <Dashboard />;
-}
+                  <div className="ad-note-block">
+                    <p className="ad-note-label">// NOTE FROM GREENCAT (shown publ
