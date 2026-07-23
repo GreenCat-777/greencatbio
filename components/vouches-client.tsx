@@ -13,6 +13,7 @@ type Vouch = {
   name: string;
   body: string;
   user_confirmed: boolean;
+  admin_note: string | null;
   created_at: string;
 };
 
@@ -59,7 +60,7 @@ export default function VouchesClient() {
     setFetching(true);
     const { data } = await supabase
       .from("vouches")
-      .select("id, name, body, user_confirmed, created_at")
+      .select("id, name, body, user_confirmed, admin_note, created_at")
       .eq("admin_approved", true)
       .order("created_at", { ascending: false });
     if (data) setVouches(data);
@@ -131,6 +132,7 @@ export default function VouchesClient() {
     .vc-badge-confirmed { border:1px solid rgba(14,209,69,0.5); color:rgba(14,209,69,0.7); }
     .vc-badge-unconfirmed { border:1px solid rgba(14,209,69,0.2); color:rgba(14,209,69,0.35); }
     .vc-body { font-size:0.88rem; line-height:1.6; opacity:0.88; white-space:pre-wrap; word-break:break-word; margin:0; }
+    .vc-note { font-size:0.78rem; font-style:italic; opacity:0.65; white-space:pre-wrap; word-break:break-word; margin:8px 0 0; padding-top:6px; border-top:1px dashed rgba(14,209,69,0.2); }
     .vc-divider { border:none; border-top:1px solid rgba(14,209,69,0.15); margin:1.25rem 0; }
   `;
 
@@ -228,6 +230,9 @@ export default function VouchesClient() {
                       )}
                     </div>
                     <p className="vc-body">{v.body}</p>
+                    {v.admin_note && (
+                      <p className="vc-note">Note From GreenCat: {v.admin_note}</p>
+                    )}
                   </div>
                 </div>
               ))
