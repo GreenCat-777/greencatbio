@@ -1,0 +1,70 @@
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import type { Session } from "@supabase/supabase-js";
+import { supabaseBrowser } from "@/lib/supabase-browser";
+
+export type Profile = { id: string; username: string; avatar_url: string | null };
+export type AccountState = "loading" | "signed-out" | "needs-username" | "ready";
+
+export function useAccount() {
+  const [state, setState] = useState<AccountState>("loading");
+  const [session, setSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+
+  const loadProfile = useCallback(async (userId: string) => {
+    const { data } = await supabaseBrowser
+      .from("profiles")
+      .select("id, username, avatar_url")
+      .eq("id", userId)
+      .maybeSingle();
+    return data as Profile | null;
+  }, []);
+
+  const refresh = useCallback(
+    async (sess: Session | null) => {
+      setSession(sess);
+      if (!sess) {
+        setProfile(null);
+        setState("signed-out");
+        return;
+      }
+      const p = await loadProfile(sess.user.id);
+      if (!p) {
+        setState("needs-username");
+      } else {
+        setProfile(p);
+        setState("ready");
+      }
+    },
+    [loadProfile]
+  );
+
+  useEffect(() => {
+    supabaseBrowser.auth.getSession().then(({ data }) => refresh(data.session));
+    const { data: sub } = supabaseBrowser.auth.onAuthStateChange((_event, sess) => refresh(sess));
+    return () => sub.subscription.unsubscribe();
+  }, [refresh]);
+
+  async function completeUsername(username: string) {
+    if (!session) throw new Error("Not signed in.");
+    const { error } = await supabaseBrowser
+      .from("profiles")
+      .insert([{ id: session.user.id, username }]);
+    if (error) throw error;
+    setProfile({ id: session.user.id, username, avatar_url: null });
+    setState("ready");
+  }
+
+  async function signOut() {
+    await supabaseBrowser.auth.signOut();
+  }
+
+  async function refreshProfile() {
+    if (!session) return;
+    const p = await loadProfile(session.user.id);
+    if (p) setProfile(p);
+  }
+
+  return { state, session, profile, completeUsername, signOut, refreshProfile };
+}

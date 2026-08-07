@@ -21,9 +21,32 @@ export async function POST(req: Request) {
 
     const supabase = createServerSupabase();
 
+    // If the request carries a valid session for a verified account whose
+    // email matches, skip the email-confirmation step entirely.
+    let preConfirmed = false;
+    const authHeader = req.headers.get("authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      const token = authHeader.slice(7);
+      const { data: userData } = await supabase.auth.getUser(token);
+      if (
+        userData?.user &&
+        userData.user.email_confirmed_at &&
+        userData.user.email?.toLowerCase() === email.trim().toLowerCase()
+      ) {
+        preConfirmed = true;
+      }
+    }
+
     const { data, error } = await supabase
       .from("vouches")
-      .insert([{ name: name.trim(), body: body.trim(), email: email.trim().toLowerCase() }])
+      .insert([
+        {
+          name: name.trim(),
+          body: body.trim(),
+          email: email.trim().toLowerCase(),
+          user_confirmed: preConfirmed,
+        },
+      ])
       .select()
       .single();
 
@@ -34,19 +57,21 @@ export async function POST(req: Request) {
 
     const siteUrl = "https://www.greencat777.xyz";
 
-    try {
-      await sendEmail({
-        to: email.trim().toLowerCase(),
-        subject: "Confirm your vouch on greencat777.xyz",
-        html: buildConfirmationEmail({
-          name: name.trim(),
-          body: body.trim(),
-          token: data.confirm_token,
-          siteUrl,
-        }),
-      });
-    } catch (emailErr) {
-      console.error("Failed to send confirmation email:", emailErr);
+    if (!preConfirmed) {
+      try {
+        await sendEmail({
+          to: email.trim().toLowerCase(),
+          subject: "Confirm your vouch on greencat777.xyz",
+          html: buildConfirmationEmail({
+            name: name.trim(),
+            body: body.trim(),
+            token: data.confirm_token,
+            siteUrl,
+          }),
+        });
+      } catch (emailErr) {
+        console.error("Failed to send confirmation email:", emailErr);
+      }
     }
 
     try {
@@ -64,7 +89,7 @@ export async function POST(req: Request) {
       console.error("Failed to send admin email:", emailErr);
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, preConfirmed });
   } catch (err) {
     console.error("Vouch submission error:", err);
     return NextResponse.json({ error: "Internal server error." }, { status: 500 });

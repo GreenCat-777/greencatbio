@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
-import { cookies } from "next/headers";
 
 function isAuthed(req: Request): boolean {
   const cookieHeader = req.headers.get("cookie") || "";
