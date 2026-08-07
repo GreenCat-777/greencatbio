@@ -172,6 +172,12 @@ export default function TerminalBio() {
                 >
                   Discord
                 </a>
+                <a
+                  href="/pm"
+                  className="button-glow inline-block px-6 py-3 border-2 border-[#0ed145] rounded-lg text-[#0ed145] hover:bg-[#0ed145] hover:text-black transition-all font-medium"
+                >
+                  ✉ Private Message
+                </a>
               </div>
             )}
           </div>

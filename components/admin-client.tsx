@@ -452,6 +452,444 @@ function Dashboard() {
   );
 }
 
+// ── ACCOUNTS PANEL ─────────────────────────────────────────────
+type UserRow = {
+  id: string;
+  email: string | null;
+  email_confirmed: boolean;
+  created_at: string;
+  last_sign_in_at: string | null;
+  username: string | null;
+  avatar_url: string | null;
+};
+
+function AccountsPanel() {
+  const [users, setUsers] = useState<UserRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const css = `
+    .ad-wrap { font-family:monospace; color:#0ed145; }
+    .ad-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.25rem; padding-bottom:0.75rem; border-bottom:1px solid rgba(14,209,69,0.2); flex-wrap:wrap; gap:0.5rem; }
+    .ad-title { font-size:1.1rem; font-weight:bold; letter-spacing:0.06em; }
+    .ad-refresh { padding:4px 14px; border:1px solid rgba(14,209,69,0.4); border-radius:5px; background:transparent; color:rgba(14,209,69,0.6); font-family:monospace; font-size:0.78rem; cursor:pointer; transition:all 0.15s; }
+    .ad-refresh:hover { border-color:#0ed145; color:#0ed145; }
+    .ad-box { border:2px solid #0ed145; border-radius:12px; padding:1.5rem; background:rgba(0,0,0,0.5); box-shadow:0 0 24px rgba(14,209,69,0.25); }
+    .ad-list { display:flex; flex-direction:column; gap:0.85rem; }
+    .ad-empty { opacity:0.4; font-size:0.85rem; text-align:center; padding:2rem 0; }
+    .ad-item { border:1px solid rgba(14,209,69,0.2); border-radius:8px; padding:1rem; background:rgba(14,209,69,0.02); }
+    .ad-row1 { display:flex; align-items:baseline; gap:0.75rem; margin-bottom:6px; flex-wrap:wrap; }
+    .ad-name { font-weight:bold; font-size:0.9rem; }
+    .ad-time { font-size:0.7rem; opacity:0.4; }
+    .ad-badge-confirmed { font-size:0.65rem; padding:1px 7px; border-radius:4px; border:1px solid rgba(14,209,69,0.5); color:rgba(14,209,69,0.7); font-weight:bold; }
+    .ad-badge-unconfirmed { font-size:0.65rem; padding:1px 7px; border-radius:4px; border:1px solid rgba(14,209,69,0.2); color:rgba(14,209,69,0.35); }
+    .ad-body { font-size:0.85rem; line-height:1.6; opacity:0.8; white-space:pre-wrap; word-break:break-word; margin:0 0 10px; }
+    .ad-actions { display:flex; gap:0.4rem; flex-wrap:wrap; }
+    .ad-btn { padding:4px 14px; border-radius:5px; font-family:monospace; font-size:0.78rem; font-weight:bold; cursor:pointer; transition:all 0.15s; border:1px solid; letter-spacing:0.04em; }
+    .ad-btn:disabled { opacity:0.4; cursor:not-allowed; }
+    .ad-btn-delete { border-color:rgba(255,85,85,0.4); color:rgba(255,85,85,0.7); background:transparent; }
+    .ad-btn-delete:hover:not(:disabled) { background:rgba(255,85,85,0.15); border-color:#ff5555; color:#ff5555; }
+    .ad-toast { position:fixed; bottom:24px; right:24px; background:#0ed145; color:#000; font-family:monospace; font-size:0.85rem; font-weight:bold; padding:10px 20px; border-radius:8px; box-shadow:0 0 20px rgba(14,209,69,0.5); z-index:9999; animation:ad-fadein 0.2s ease; }
+    @keyframes ad-fadein { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+    .ad-spinner { display:inline-block; width:12px; height:12px; border:1px solid rgba(14,209,69,0.3); border-top-color:#0ed145; border-radius:50%; animation:ad-spin 0.7s linear infinite; margin-right:4px; vertical-align:middle; }
+    @keyframes ad-spin { to{transform:rotate(360deg)} }
+    .ad-stats { display:flex; gap:0.75rem; margin-bottom:1.25rem; flex-wrap:wrap; }
+    .ad-stat { border:1px solid rgba(14,209,69,0.2); border-radius:6px; padding:8px 14px; background:rgba(14,209,69,0.03); }
+    .ad-stat-val { font-size:1.4rem; font-weight:bold; line-height:1; }
+    .ad-stat-label { font-size:0.68rem; opacity:0.4; margin-top:2px; letter-spacing:0.06em; }
+  `;
+
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/users");
+      const data = await res.json();
+      if (data.users) setUsers(data.users);
+    } catch {
+      showToast("Failed to load accounts.");
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchUsers(); }, [fetchUsers]);
+
+  function showToast(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
+  }
+
+  async function deleteUser(id: string, label: string) {
+    if (!confirm(`Permanently delete ${label}'s account and all their data (vouches, comments, messages)?`)) return;
+    setActionLoading(id);
+    try {
+      await fetch("/api/admin/users", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      setUsers((u) => u.filter((x) => x.id !== id));
+      showToast("✓ Account deleted.");
+    } catch {
+      showToast("Error deleting account.");
+    }
+    setActionLoading(null);
+  }
+
+  return (
+    <div className="ad-wrap">
+      <style>{css}</style>
+      <div className="ad-box">
+        <div className="ad-header">
+          <div>
+            <p style={{ margin: "0 0 2px", fontSize: "0.78rem", opacity: 0.45, letterSpacing: "0.08em" }}>greencat777@bio:~$</p>
+            <span className="ad-title">// ADMIN DASHBOARD — ACCOUNTS</span>
+          </div>
+          <button className="ad-refresh" onClick={fetchUsers}>↺ refresh</button>
+        </div>
+
+        <div className="ad-stats">
+          <div className="ad-stat">
+            <div className="ad-stat-val">{users.length}</div>
+            <div className="ad-stat-label">TOTAL ACCOUNTS</div>
+          </div>
+          <div className="ad-stat">
+            <div className="ad-stat-val">{users.filter((u) => u.email_confirmed).length}</div>
+            <div className="ad-stat-label">VERIFIED</div>
+          </div>
+        </div>
+
+        <div className="ad-list">
+          {loading ? (
+            <p className="ad-empty"><span className="ad-spinner" />loading...</p>
+          ) : users.length === 0 ? (
+            <p className="ad-empty">No accounts yet.</p>
+          ) : (
+            users.map((u) => (
+              <div key={u.id} className="ad-item">
+                <div className="ad-row1">
+                  <span className="ad-name">{u.username || "(no username set)"}</span>
+                  <span className="ad-time">joined {timeAgo(u.created_at)}</span>
+                  {u.email_confirmed
+                    ? <span className="ad-badge-confirmed">✓ Verified</span>
+                    : <span className="ad-badge-unconfirmed">Unverified</span>}
+                </div>
+                <div style={{ fontSize: "0.75rem", opacity: 0.4, marginBottom: "8px" }}>
+                  ✉ {u.email} {u.last_sign_in_at && `· last seen ${timeAgo(u.last_sign_in_at)}`}
+                </div>
+                <div className="ad-actions">
+                  <button
+                    className="ad-btn ad-btn-delete"
+                    onClick={() => deleteUser(u.id, u.username || u.email || "this user")}
+                    disabled={!!actionLoading}
+                  >
+                    {actionLoading === u.id ? <><span className="ad-spinner" />deleting...</> : "✕ Delete Account"}
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+      {toast && <div className="ad-toast">{toast}</div>}
+    </div>
+  );
+}
+
+// ── MESSAGES PANEL ──────────────────────────────────────────────
+type MessageRow = {
+  id: string;
+  sender_id: string | null;
+  recipient_id: string | null;
+  other_id: string;
+  other_username: string;
+  from_admin: boolean;
+  body: string;
+  created_at: string;
+  read_at: string | null;
+};
+
+type Conversation = {
+  otherId: string;
+  otherUsername: string;
+  lastBody: string;
+  lastAt: string;
+  unread: boolean;
+};
+
+function MessagesPanel() {
+  const [messages, setMessages] = useState<MessageRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [activeConvo, setActiveConvo] = useState<Conversation | null>(null);
+  const [reply, setReply] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const css = `
+    .ad-wrap { font-family:monospace; color:#0ed145; }
+    .ad-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.25rem; padding-bottom:0.75rem; border-bottom:1px solid rgba(14,209,69,0.2); flex-wrap:wrap; gap:0.5rem; }
+    .ad-title { font-size:1.1rem; font-weight:bold; letter-spacing:0.06em; }
+    .ad-refresh { padding:4px 14px; border:1px solid rgba(14,209,69,0.4); border-radius:5px; background:transparent; color:rgba(14,209,69,0.6); font-family:monospace; font-size:0.78rem; cursor:pointer; transition:all 0.15s; }
+    .ad-refresh:hover { border-color:#0ed145; color:#0ed145; }
+    .ad-box { border:2px solid #0ed145; border-radius:12px; padding:1.5rem; background:rgba(0,0,0,0.5); box-shadow:0 0 24px rgba(14,209,69,0.25); }
+    .ad-list { display:flex; flex-direction:column; gap:0.85rem; }
+    .ad-empty { opacity:0.4; font-size:0.85rem; text-align:center; padding:2rem 0; }
+    .ad-item { border:1px solid rgba(14,209,69,0.2); border-radius:8px; padding:1rem; background:rgba(14,209,69,0.02); cursor:pointer; transition:border-color 0.15s; text-align:left; width:100%; }
+    .ad-item:hover { border-color:rgba(14,209,69,0.4); }
+    .ad-row1 { display:flex; align-items:baseline; gap:0.75rem; margin-bottom:6px; flex-wrap:wrap; }
+    .ad-name { font-weight:bold; font-size:0.9rem; }
+    .ad-time { font-size:0.7rem; opacity:0.4; }
+    .ad-badge-confirmed { font-size:0.65rem; padding:1px 7px; border-radius:4px; border:1px solid rgba(14,209,69,0.5); color:rgba(14,209,69,0.7); font-weight:bold; }
+    .ad-badge-unconfirmed { font-size:0.65rem; padding:1px 7px; border-radius:4px; border:1px solid rgba(14,209,69,0.2); color:rgba(14,209,69,0.35); }
+    .ad-body { font-size:0.85rem; line-height:1.6; opacity:0.8; white-space:pre-wrap; word-break:break-word; margin:0 0 10px; }
+    .ad-actions { display:flex; gap:0.4rem; flex-wrap:wrap; }
+    .ad-btn { padding:4px 14px; border-radius:5px; font-family:monospace; font-size:0.78rem; font-weight:bold; cursor:pointer; transition:all 0.15s; border:1px solid; letter-spacing:0.04em; }
+    .ad-btn:disabled { opacity:0.4; cursor:not-allowed; }
+    .ad-btn-delete { border-color:rgba(255,85,85,0.4); color:rgba(255,85,85,0.7); background:transparent; }
+    .ad-btn-delete:hover:not(:disabled) { background:rgba(255,85,85,0.15); border-color:#ff5555; color:#ff5555; }
+    .ad-btn-approve { border-color:rgba(14,209,69,0.5); color:rgba(14,209,69,0.8); background:transparent; }
+    .ad-btn-approve:hover:not(:disabled) { background:#0ed145; color:#000; border-color:#0ed145; }
+    .ad-toast { position:fixed; bottom:24px; right:24px; background:#0ed145; color:#000; font-family:monospace; font-size:0.85rem; font-weight:bold; padding:10px 20px; border-radius:8px; box-shadow:0 0 20px rgba(14,209,69,0.5); z-index:9999; animation:ad-fadein 0.2s ease; }
+    @keyframes ad-fadein { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+    .ad-spinner { display:inline-block; width:12px; height:12px; border:1px solid rgba(14,209,69,0.3); border-top-color:#0ed145; border-radius:50%; animation:ad-spin 0.7s linear infinite; margin-right:4px; vertical-align:middle; }
+    @keyframes ad-spin { to{transform:rotate(360deg)} }
+    .ad-stats { display:flex; gap:0.75rem; margin-bottom:1.25rem; flex-wrap:wrap; }
+    .ad-stat { border:1px solid rgba(14,209,69,0.2); border-radius:6px; padding:8px 14px; background:rgba(14,209,69,0.03); }
+    .ad-stat-val { font-size:1.4rem; font-weight:bold; line-height:1; }
+    .ad-stat-label { font-size:0.68rem; opacity:0.4; margin-top:2px; letter-spacing:0.06em; }
+    .ad-back { background:transparent; border:none; color:#0ed145; font-size:1.1rem; cursor:pointer; padding:0 6px; }
+    .ad-thread-body { display:flex; flex-direction:column; gap:0.5rem; max-height:340px; overflow-y:auto; margin-bottom:1rem; padding-right:2px; }
+    .ad-msg { max-width:75%; padding:0.5rem 0.8rem; border-radius:10px; font-size:0.85rem; line-height:1.5; word-break:break-word; white-space:pre-wrap; }
+    .ad-msg-mine { align-self:flex-end; background:rgba(14,209,69,0.18); border:1px solid rgba(14,209,69,0.4); }
+    .ad-msg-theirs { align-self:flex-start; background:rgba(14,209,69,0.05); border:1px solid rgba(14,209,69,0.15); }
+    .ad-msg-time { font-size:0.62rem; opacity:0.35; margin-top:3px; }
+    .ad-reply-row { display:flex; gap:0.5rem; padding-top:1rem; border-top:1px solid rgba(14,209,69,0.15); }
+    .ad-reply-input { flex:1; background:transparent; border:1px solid rgba(14,209,69,0.35); border-radius:6px; padding:0.5rem 0.75rem; color:#0ed145; font-family:monospace; font-size:0.85rem; outline:none; resize:none; }
+    .ad-reply-input:focus { border-color:#0ed145; box-shadow:0 0 8px rgba(14,209,69,0.25); }
+  `;
+
+  const fetchMessages = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/messages");
+      const data = await res.json();
+      if (data.messages) setMessages(data.messages);
+    } catch {
+      showToast("Failed to load messages.");
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchMessages(); }, [fetchMessages]);
+
+  function showToast(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
+  }
+
+  const conversations: Conversation[] = (() => {
+    const byOther = new Map<string, { username: string; lastBody: string; lastAt: string; unread: boolean }>();
+    for (const m of messages) {
+      const existing = byOther.get(m.other_id);
+      const isUnread = m.from_admin === false && !m.read_at;
+      if (!existing || new Date(m.created_at) >= new Date(existing.lastAt)) {
+        byOther.set(m.other_id, {
+          username: m.other_username,
+          lastBody: m.body,
+          lastAt: m.created_at,
+          unread: existing?.unread || isUnread,
+        });
+      } else if (isUnread) {
+        existing.unread = true;
+      }
+    }
+    return Array.from(byOther.entries())
+      .map(([otherId, v]) => ({ otherId, otherUsername: v.username, lastBody: v.lastBody, lastAt: v.lastAt, unread: v.unread }))
+      .sort((a, b) => new Date(b.lastAt).getTime() - new Date(a.lastAt).getTime());
+  })();
+
+  const threadMessages = activeConvo ? messages.filter((m) => m.other_id === activeConvo.otherId) : [];
+
+  async function openConvo(c: Conversation) {
+    setActiveConvo(c);
+    try {
+      await fetch("/api/admin/messages", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ otherId: c.otherId }),
+      });
+      fetchMessages();
+    } catch {
+      // non-critical
+    }
+  }
+
+  async function sendReply() {
+    if (!activeConvo || !reply.trim()) return;
+    setSending(true);
+    try {
+      await fetch("/api/admin/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipientId: activeConvo.otherId, body: reply.trim() }),
+      });
+      setReply("");
+      fetchMessages();
+    } catch {
+      showToast("Failed to send reply.");
+    }
+    setSending(false);
+  }
+
+  async function deleteMessage(id: string) {
+    if (!confirm("Permanently delete this message?")) return;
+    setActionLoading(id);
+    try {
+      await fetch("/api/admin/messages", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      setMessages((m) => m.filter((x) => x.id !== id));
+      showToast("✓ Message deleted.");
+    } catch {
+      showToast("Error deleting message.");
+    }
+    setActionLoading(null);
+  }
+
+  return (
+    <div className="ad-wrap">
+      <style>{css}</style>
+      <div className="ad-box">
+        <div className="ad-header">
+          <div>
+            <p style={{ margin: "0 0 2px", fontSize: "0.78rem", opacity: 0.45, letterSpacing: "0.08em" }}>greencat777@bio:~$</p>
+            <span className="ad-title">// ADMIN DASHBOARD — MESSAGES</span>
+          </div>
+          <button className="ad-refresh" onClick={fetchMessages}>↺ refresh</button>
+        </div>
+
+        {!activeConvo ? (
+          <>
+            <div className="ad-stats">
+              <div className="ad-stat">
+                <div className="ad-stat-val">{conversations.length}</div>
+                <div className="ad-stat-label">CONVERSATIONS</div>
+              </div>
+              <div className="ad-stat">
+                <div className="ad-stat-val">{conversations.filter((c) => c.unread).length}</div>
+                <div className="ad-stat-label">UNREAD</div>
+              </div>
+            </div>
+
+            <div className="ad-list">
+              {loading ? (
+                <p className="ad-empty"><span className="ad-spinner" />loading...</p>
+              ) : conversations.length === 0 ? (
+                <p className="ad-empty">No messages yet.</p>
+              ) : (
+                conversations.map((c) => (
+                  <button key={c.otherId} className="ad-item" onClick={() => openConvo(c)}>
+                    <div className="ad-row1">
+                      <span className="ad-name">{c.otherUsername}</span>
+                      <span className="ad-time">{timeAgo(c.lastAt)}</span>
+                      {c.unread && <span className="ad-badge-confirmed">● unread</span>}
+                    </div>
+                    <p className="ad-body" style={{ marginBottom: 0 }}>{c.lastBody}</p>
+                  </button>
+                ))
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="ad-row1" style={{ marginBottom: "1rem" }}>
+              <button className="ad-back" onClick={() => setActiveConvo(null)} aria-label="Back">←</button>
+              <span className="ad-name">{activeConvo.otherUsername}</span>
+            </div>
+
+            <div className="ad-thread-body">
+              {threadMessages.map((m) => (
+                <div key={m.id} className={`ad-msg ${m.from_admin ? "ad-msg-mine" : "ad-msg-theirs"}`}>
+                  {m.body}
+                  <div className="ad-msg-time" style={{ display: "flex", justifyContent: "space-between", gap: "8px" }}>
+                    <span>{timeAgo(m.created_at)}</span>
+                    <button
+                      className="ad-btn ad-btn-delete"
+                      style={{ padding: "0 6px", fontSize: "0.6rem" }}
+                      onClick={() => deleteMessage(m.id)}
+                      disabled={actionLoading === m.id}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="ad-reply-row">
+              <textarea
+                className="ad-reply-input"
+                placeholder="reply as GreenCat..."
+                rows={1}
+                maxLength={2000}
+                value={reply}
+                onChange={(e) => setReply(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    sendReply();
+                  }
+                }}
+              />
+              <button className="ad-btn ad-btn-approve" onClick={sendReply} disabled={sending || !reply.trim()}>
+                {sending ? "..." : "→"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+      {toast && <div className="ad-toast">{toast}</div>}
+    </div>
+  );
+}
+
+// ── ADMIN SHELL (section tabs) ───────────────────────────────────
+type Section = "vouches" | "accounts" | "messages";
+
+function AdminShell() {
+  const [section, setSection] = useState<Section>("vouches");
+
+  const shellCss = `
+    .ash-tabs { display:flex; gap:0.5rem; margin-bottom:1rem; font-family:monospace; }
+    .ash-tab { padding:6px 18px; border:1px solid rgba(14,209,69,0.35); border-radius:6px; background:transparent; color:rgba(14,209,69,0.55); font-family:monospace; font-size:0.82rem; font-weight:bold; cursor:pointer; letter-spacing:0.05em; transition:all 0.15s; }
+    .ash-tab:hover { border-color:#0ed145; color:#0ed145; }
+    .ash-tab-active { border-color:#0ed145; background:#0ed145; color:#000; }
+  `;
+
+  return (
+    <div style={{ maxWidth: "700px", margin: "0 auto" }}>
+      <style>{shellCss}</style>
+      <div className="ash-tabs">
+        <button className={`ash-tab${section === "vouches" ? " ash-tab-active" : ""}`} onClick={() => setSection("vouches")}>
+          VOUCHES
+        </button>
+        <button className={`ash-tab${section === "accounts" ? " ash-tab-active" : ""}`} onClick={() => setSection("accounts")}>
+          ACCOUNTS
+        </button>
+        <button className={`ash-tab${section === "messages" ? " ash-tab-active" : ""}`} onClick={() => setSection("messages")}>
+          MESSAGES
+        </button>
+      </div>
+      {section === "vouches" && <Dashboard />}
+      {section === "accounts" && <AccountsPanel />}
+      {section === "messages" && <MessagesPanel />}
+    </div>
+  );
+}
+
 // ── MAIN EXPORT ─────────────────────────────────────────────────
 export default function AdminClient() {
   const [authed, setAuthed] = useState<boolean | null>(null);
@@ -477,5 +915,5 @@ export default function AdminClient() {
     return <LoginScreen onLogin={() => setAuthed(true)} />;
   }
 
-  return <Dashboard />;
+  return <AdminShell />;
 }

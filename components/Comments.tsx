@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
+import { useAccount } from "@/lib/use-account";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,6 +14,7 @@ type Comment = {
   username: string;
   body: string;
   created_at: string;
+  user_id: string | null;
 };
 
 function Avatar({ name }: { name: string }) {
@@ -40,6 +42,8 @@ function timeAgo(dateStr: string) {
 }
 
 export default function Comments() {
+  const { state: authState, session, profile } = useAccount();
+
   const [comments, setComments] = useState<Comment[]>([]);
   const [username, setUsername] = useState("");
   const [body, setBody] = useState("");
@@ -49,6 +53,13 @@ export default function Comments() {
   const [fetching, setFetching] = useState(true);
 
   useEffect(() => { fetchComments(); }, []);
+
+  // If signed in, lock the identity field to the account's username.
+  useEffect(() => {
+    if (authState === "ready" && profile) setUsername(profile.username);
+  }, [authState, profile]);
+
+  const loggedIn = authState === "ready" && !!profile;
 
   async function fetchComments() {
     setFetching(true);
@@ -65,8 +76,14 @@ export default function Comments() {
     if (username.length > 32) return setError("Username too long (max 32).");
     if (body.length > 500) return setError("Too long (max 500 chars).");
     setLoading(true);
-    const { error } = await supabase
-      .from("comments").insert([{ username: username.trim(), body: body.trim() }]);
+
+    const payload: { username: string; body: string; user_id?: string } = {
+      username: username.trim(),
+      body: body.trim(),
+    };
+    if (loggedIn && session) payload.user_id = session.user.id;
+
+    const { error } = await supabase.from("comments").insert([payload]);
     setLoading(false);
     if (error) {
       setError("Failed to post. Try again.");
@@ -83,11 +100,15 @@ export default function Comments() {
     .gc-dot { width: 8px; height: 8px; border-radius: 50%; background: #0ed145; box-shadow: 0 0 6px #0ed145; }
     .gc-title { font-size: 0.95rem; font-weight: bold; letter-spacing: 0.08em; opacity: 0.9; }
     .gc-count { margin-left: auto; font-size: 0.75rem; opacity: 0.45; }
+    .gc-pm-link { font-size: 0.78rem; color: rgba(14,209,69,0.6); text-decoration: none; border: 1px solid rgba(14,209,69,0.3); border-radius: 5px; padding: 3px 12px; transition: all 0.15s; }
+    .gc-pm-link:hover { color: #0ed145; border-color: #0ed145; }
     .gc-form { background: rgba(14,209,69,0.03); border: 1px solid rgba(14,209,69,0.2); border-radius: 8px; padding: 1rem; margin-bottom: 1.25rem; display: flex; flex-direction: column; gap: 0.6rem; }
+    .gc-signed-in-row { font-size: 0.72rem; opacity: 0.5; display: flex; align-items: center; gap: 6px; }
     .gc-row { display: flex; gap: 0.6rem; align-items: center; }
     .gc-input { flex: 1; background: transparent; border: 1px solid rgba(14,209,69,0.35); border-radius: 6px; padding: 0.45rem 0.7rem; color: #0ed145; font-family: monospace; font-size: 0.875rem; outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
     .gc-input:focus { border-color: #0ed145; box-shadow: 0 0 8px rgba(14,209,69,0.25); }
     .gc-input::placeholder { color: rgba(14,209,69,0.35); }
+    .gc-input:disabled { opacity: 0.6; cursor: not-allowed; }
     .gc-textarea { width: 100%; background: transparent; border: 1px solid rgba(14,209,69,0.35); border-radius: 6px; padding: 0.5rem 0.7rem; color: #0ed145; font-family: monospace; font-size: 0.875rem; outline: none; resize: vertical; min-height: 80px; box-sizing: border-box; transition: border-color 0.15s, box-shadow 0.15s; }
     .gc-textarea:focus { border-color: #0ed145; box-shadow: 0 0 8px rgba(14,209,69,0.25); }
     .gc-textarea::placeholder { color: rgba(14,209,69,0.35); }
@@ -105,6 +126,7 @@ export default function Comments() {
     .gc-item-body { flex: 1; min-width: 0; }
     .gc-meta { display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 0.3rem; }
     .gc-uname { font-weight: bold; font-size: 0.85rem; }
+    .gc-verified-badge { font-size: 0.62rem; padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(14,209,69,0.5); color: rgba(14,209,69,0.7); font-weight: bold; }
     .gc-time { font-size: 0.7rem; opacity: 0.4; }
     .gc-body { font-size: 0.875rem; line-height: 1.55; opacity: 0.88; white-space: pre-wrap; word-break: break-word; margin: 0; }
     .gc-hint { font-size: 0.7rem; opacity: 0.3; }
@@ -121,10 +143,18 @@ export default function Comments() {
           <span className="gc-count">
             {fetching ? "..." : `${comments.length} post${comments.length !== 1 ? "s" : ""}`}
           </span>
+          <a href="/pm" className="gc-pm-link">✉ PM</a>
         </div>
 
         {/* Form */}
         <div className="gc-form">
+          <div className="gc-signed-in-row">
+            {loggedIn ? (
+              <span>✓ posting as <strong>{profile!.username}</strong> (verified account)</span>
+            ) : (
+              <span>posting as guest — <a href="/pm" style={{ color: "#0ed145" }}>sign in</a> to post under your account</span>
+            )}
+          </div>
           <div className="gc-row">
             <input
               className="gc-input"
@@ -132,6 +162,7 @@ export default function Comments() {
               placeholder="username"
               maxLength={32}
               value={username}
+              disabled={loggedIn}
               onChange={(e) => setUsername(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
             />
@@ -170,6 +201,7 @@ export default function Comments() {
                 <div className="gc-item-body">
                   <div className="gc-meta">
                     <span className="gc-uname">{c.username}</span>
+                    {c.user_id && <span className="gc-verified-badge">✓ verified</span>}
                     <span className="gc-time">{timeAgo(c.created_at)}</span>
                   </div>
                   <p className="gc-body">{c.body}</p>
