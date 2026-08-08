@@ -29,7 +29,10 @@ export async function POST(req: Request) {
     }
 
     const rawBody = await req.text();
-    const wh = new Webhook(hookSecret);
+    // Supabase shows the secret as "v1,whsec_XXXX" — the library only
+    // understands the "whsec_" part, so strip any leading version tag.
+    const cleanSecret = hookSecret.includes(",") ? hookSecret.split(",").pop()!.trim() : hookSecret;
+    const wh = new Webhook(cleanSecret);
 
     let payload: HookPayload;
     try {
