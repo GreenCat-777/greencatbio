@@ -1,48 +1,43 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { supabaseBrowser } from "@/lib/supabase-browser";
+import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 
-type State = "waiting" | "ready" | "done" | "invalid";
+type State = "form" | "done" | "error";
 
 export default function ResetPasswordClient() {
-  const [state, setState] = useState<State>("waiting");
+  const searchParams = useSearchParams();
+  const token = searchParams.get("token");
+
+  const [state, setState] = useState<State>(token ? "form" : "error");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const { data: sub } = supabaseBrowser.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") setState("ready");
-    });
-
-    // In case the recovery session is already active by the time we mount.
-    const timeout = setTimeout(() => {
-      supabaseBrowser.auth.getSession().then(({ data }) => {
-        if (data.session && state === "waiting") setState("ready");
-        else if (!data.session && state === "waiting") setState("invalid");
-      });
-    }, 1500);
-
-    return () => {
-      sub.subscription.unsubscribe();
-      clearTimeout(timeout);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   async function savePassword() {
     setError(null);
     if (password.length < 8) return setError("Password must be at least 8 characters.");
     if (password !== confirmPassword) return setError("Passwords don't match.");
+    if (!token) return setError("Missing token.");
 
     setSaving(true);
-    const { error } = await supabaseBrowser.auth.updateUser({ password });
+    try {
+      const res = await fetch("/api/account/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Failed to reset password.");
+      } else {
+        setState("done");
+      }
+    } catch {
+      setError("Network error. Please try again.");
+    }
     setSaving(false);
-
-    if (error) setError(error.message);
-    else setState("done");
   }
 
   const css = `
@@ -66,22 +61,15 @@ export default function ResetPasswordClient() {
         <div className="rp-box">
           <p className="rp-prompt">greencat777@bio:~$ reset_password</p>
 
-          {state === "waiting" && (
-            <>
-              <h1 className="rp-title">Verifying link...</h1>
-              <p className="rp-sub">One sec.</p>
-            </>
-          )}
-
-          {state === "invalid" && (
+          {state === "error" && (
             <>
               <h1 className="rp-title" style={{ color: "#ff5555" }}>⚠ Link Invalid</h1>
-              <p className="rp-sub">This reset link is invalid or expired. Request a new one from the sign-in screen.</p>
+              <p className="rp-sub">This reset link is missing or invalid. Request a new one from the sign-in screen.</p>
               <a href="/pm" className="rp-btn">← Back to Sign In</a>
             </>
           )}
 
-          {state === "ready" && (
+          {state === "form" && (
             <>
               <h1 className="rp-title">Set New Password</h1>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
@@ -111,8 +99,8 @@ export default function ResetPasswordClient() {
           {state === "done" && (
             <>
               <h1 className="rp-title">✓ Password Updated</h1>
-              <p className="rp-sub">You&apos;re signed in with your new password.</p>
-              <a href="/pm" className="rp-btn">→ Go to Messages</a>
+              <p className="rp-sub">Sign in with your new password.</p>
+              <a href="/pm" className="rp-btn">→ Go to Sign In</a>
             </>
           )}
         </div>

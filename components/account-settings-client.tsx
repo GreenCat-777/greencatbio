@@ -149,40 +149,64 @@ export default function AccountSettingsClient() {
     if (session && newEmail.toLowerCase() === (session.user.email || "").toLowerCase()) {
       return setEmailMsg({ text: "That's already your email.", err: true });
     }
+    if (!session) return;
 
     setEmailSaving(true);
-    const { error } = await supabaseBrowser.auth.updateUser({ email: newEmail });
-    setEmailSaving(false);
-
-    if (error) {
-      setEmailMsg({ text: error.message, err: true });
-    } else {
-      setPendingEmail(newEmail);
-      setEmailMsg({ text: "✓ Confirmation link(s) sent — check your inbox(es) to finish the change.", err: false });
+    try {
+      const res = await fetch("/api/account/request-email-change", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ newEmail }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setEmailMsg({ text: data.error || "Failed to request change.", err: true });
+      } else {
+        setPendingEmail(newEmail);
+        setEmailMsg({ text: "✓ Confirmation link sent to your new address — click it to finish the change.", err: false });
+      }
+    } catch {
+      setEmailMsg({ text: "Network error.", err: true });
     }
+    setEmailSaving(false);
   }
 
   async function resendEmailVerification() {
-    if (!pendingEmail) return;
+    if (!pendingEmail || !session) return;
     setResending(true);
-    const { error } = await supabaseBrowser.auth.resend({ type: "email_change", email: pendingEmail });
+    try {
+      const res = await fetch("/api/account/request-email-change", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ newEmail: pendingEmail }),
+      });
+      const data = await res.json();
+      setEmailMsg(
+        res.ok
+          ? { text: "✓ Verification email resent.", err: false }
+          : { text: data.error || "Failed to resend.", err: true }
+      );
+    } catch {
+      setEmailMsg({ text: "Network error.", err: true });
+    }
     setResending(false);
-    setEmailMsg(
-      error
-        ? { text: error.message, err: true }
-        : { text: "✓ Verification email resent.", err: false }
-    );
   }
 
   async function sendPasswordReset() {
     if (!session?.user.email) return;
     setPwSending(true);
     setPwMsg(null);
-    const { error } = await supabaseBrowser.auth.resetPasswordForEmail(session.user.email, {
-      redirectTo: typeof window !== "undefined" ? `${window.location.origin}/pm/reset` : undefined,
-    });
+    try {
+      await fetch("/api/account/request-reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: session.user.email }),
+      });
+      setPwMsg("📬 Check your email for a reset link.");
+    } catch {
+      setPwMsg("Network error.");
+    }
     setPwSending(false);
-    setPwMsg(error ? error.message : "📬 Check your email for a reset link.");
   }
 
   function startEditVouch(v: MyVouch) {

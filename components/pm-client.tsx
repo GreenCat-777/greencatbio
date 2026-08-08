@@ -28,20 +28,17 @@ function timeAgo(dateStr: string) {
 }
 
 export default function PmClient() {
-  const { state: authState, session, profile, completeUsername, signOut } = useAccount();
+  const { state: authState, session, profile, signOut } = useAccount();
 
   const [tab, setTab] = useState<AuthTab>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [signupUsername, setSignupUsername] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [signupSent, setSignupSent] = useState(false);
   const [resetSent, setResetSent] = useState(false);
-
-  const [usernameInput, setUsernameInput] = useState("");
-  const [usernameSaving, setUsernameSaving] = useState(false);
-  const [usernameError, setUsernameError] = useState<string | null>(null);
 
   const [thread, setThread] = useState<Message[]>([]);
   const [loadingThread, setLoadingThread] = useState(false);
@@ -50,9 +47,9 @@ export default function PmClient() {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (authState === "ready" && session) loadThread(session.user.id);
+    if (authState === "ready" && session && profile?.verified) loadThread(session.user.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authState, session]);
+  }, [authState, session, profile?.verified]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -93,50 +90,44 @@ export default function PmClient() {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setAuthError("Enter a valid email.");
     if (password.length < 8) return setAuthError("Password must be at least 8 characters.");
     if (password !== confirmPassword) return setAuthError("Passwords don't match.");
+    const uname = signupUsername.trim();
+    if (uname.length < 3 || uname.length > 24) return setAuthError("Username must be 3–24 characters.");
+    if (!/^[a-zA-Z0-9_]+$/.test(uname)) return setAuthError("Username: letters, numbers, underscores only.");
 
     setAuthLoading(true);
-    const { error } = await supabaseBrowser.auth.signUp({
-      email: email.trim(),
-      password,
-      options: {
-        emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/pm` : undefined,
-      },
-    });
-    setAuthLoading(false);
-    if (error) {
-      setAuthError(error.message);
-    } else {
-      setSignupSent(true);
+    try {
+      const res = await fetch("/api/account/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), password, username: uname }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAuthError(data.error || "Failed to create account.");
+      } else {
+        setSignupSent(true);
+      }
+    } catch {
+      setAuthError("Network error. Please try again.");
     }
+    setAuthLoading(false);
   }
 
   async function handleForgotPassword() {
     setAuthError(null);
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setAuthError("Enter your email above first.");
     setAuthLoading(true);
-    const { error } = await supabaseBrowser.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: typeof window !== "undefined" ? `${window.location.origin}/pm/reset` : undefined,
-    });
-    setAuthLoading(false);
-    if (error) setAuthError(error.message);
-    else setResetSent(true);
-  }
-
-  async function saveUsername() {
-    setUsernameError(null);
-    const uname = usernameInput.trim();
-    if (!uname) return setUsernameError("Username required.");
-    if (uname.length < 3 || uname.length > 24) return setUsernameError("3–24 characters.");
-    if (!/^[a-zA-Z0-9_]+$/.test(uname)) return setUsernameError("Letters, numbers, underscores only.");
-
-    setUsernameSaving(true);
     try {
-      await completeUsername(uname);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to save.";
-      setUsernameError(msg.includes("duplicate") ? "That username is taken." : msg);
+      await fetch("/api/account/request-reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      setResetSent(true);
+    } catch {
+      setAuthError("Network error. Please try again.");
     }
-    setUsernameSaving(false);
+    setAuthLoading(false);
   }
 
   async function sendMessage() {
@@ -225,7 +216,7 @@ export default function PmClient() {
               {signupSent ? (
                 <p className="pm-sub">📬 Check your email — tap the verification link, then come back and sign in.</p>
               ) : resetSent ? (
-                <p className="pm-sub">📬 Check your email for a password reset link.</p>
+                <p className="pm-sub">📬 If that email has an account, a reset link is on its way.</p>
               ) : (
                 <>
                   <p className="pm-sub">
@@ -239,6 +230,16 @@ export default function PmClient() {
                       Create Account
                     </button>
                   </div>
+                  {tab === "signup" && (
+                    <input
+                      className="pm-input"
+                      type="text"
+                      placeholder="username"
+                      maxLength={24}
+                      value={signupUsername}
+                      onChange={(e) => setSignupUsername(e.target.value)}
+                    />
+                  )}
                   <input
                     className="pm-input"
                     type="email"
@@ -286,24 +287,19 @@ export default function PmClient() {
 
           {authState === "needs-username" && (
             <div className="pm-centered">
-              <p className="pm-sub">Pick a username for your account.</p>
-              <input
-                className="pm-input"
-                type="text"
-                placeholder="username"
-                maxLength={24}
-                value={usernameInput}
-                onChange={(e) => setUsernameInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && saveUsername()}
-              />
-              {usernameError && <span className="pm-error">⚠ {usernameError}</span>}
-              <button className="pm-btn" onClick={saveUsername} disabled={usernameSaving}>
-                {usernameSaving ? "saving..." : "→ Continue"}
-              </button>
+              <p className="pm-sub">Something's off with this account (no profile found). Contact support.</p>
             </div>
           )}
 
-          {authState === "ready" && (
+          {authState === "ready" && !profile?.verified && (
+            <div className="pm-centered">
+              <p className="pm-sub">
+                📬 Almost there — check your email and tap the verification link before messaging GreenCat.
+              </p>
+            </div>
+          )}
+
+          {authState === "ready" && profile?.verified && (
             <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
               <div className="pm-thread-header">
                 <div className="pm-thread-avatar">G</div>
@@ -314,7 +310,7 @@ export default function PmClient() {
                 {loadingThread ? (
                   <p className="pm-empty">loading...</p>
                 ) : thread.length === 0 ? (
-                  <p className="pm-empty">No messages yet — say hi, {profile?.username}.</p>
+                  <p className="pm-empty">No messages yet — say hi, {profile.username}.</p>
                 ) : (
                   thread.map((m) => (
                     <div key={m.id} className={`pm-msg ${m.sender_id === session?.user.id ? "pm-msg-mine" : "pm-msg-theirs"}`}>
