@@ -2,8 +2,6 @@ import { NextResponse } from "next/server";
 import { Webhook } from "standardwebhooks";
 import { sendEmail, buildAuthEmail } from "@/lib/email";
 
-const hookSecret = process.env.SEND_EMAIL_HOOK_SECRET!;
-
 type HookPayload = {
   user: { email: string };
   email_data: {
@@ -20,34 +18,60 @@ const SUBJECTS: Record<string, string> = {
 };
 
 export async function POST(req: Request) {
-  const rawBody = await req.text();
-
-  const wh = new Webhook(hookSecret);
-  let payload: HookPayload;
   try {
-    payload = wh.verify(rawBody, {
-      "webhook-id": req.headers.get("webhook-id") || "",
-      "webhook-timestamp": req.headers.get("webhook-timestamp") || "",
-      "webhook-signature": req.headers.get("webhook-signature") || "",
-    }) as HookPayload;
-  } catch {
-    return NextResponse.json(
-      { error: { http_code: 401, message: "Invalid webhook signature." } },
-      { status: 401 }
-    );
-  }
+    const hookSecret = process.env.SEND_EMAIL_HOOK_SECRET;
+    if (!hookSecret) {
+      console.error("SEND_EMAIL_HOOK_SECRET is not set in this deployment's env vars.");
+      return NextResponse.json(
+        { error: { http_code: 500, message: "Server misconfigured: missing hook secret." } },
+        { status: 500 }
+      );
+    }
 
-  const { user, email_data } = payload;
-  const { token_hash, redirect_to, email_action_type } = email_data;
+    const rawBody = await req.text();
+    const wh = new Webhook(hookSecret);
 
-  // Only signup / recovery / email_change are used by this app.
-  if (!SUBJECTS[email_action_type]) {
-    return NextResponse.json({ ok: true }); // nothing to send, don't error out
-  }
+    let payload: HookPayload;
+    try {
+      payload = wh.verify(rawBody, {
+        "webhook-id": req.headers.get("webhook-id") || "",
+        "webhook-timestamp": req.headers.get("webhook-timestamp") || "",
+        "webhook-signature": req.headers.get("webhook-signature") || "",
+      }) as HookPayload;
+    } catch (verifyErr) {
+      console.error("Webhook signature verification failed:", verifyErr);
+      return NextResponse.json(
+        { error: { http_code: 401, message: "Invalid webhook signature." } },
+        { status: 401 }
+      );
+    }
 
-  const confirmationUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/verify?token=${token_hash}&type=${email_action_type}&redirect_to=${encodeURIComponent(redirect_to)}`;
+    const { user, email_data } = payload;
+    if (!user?.email || !email_data?.token_hash) {
+      console.error("Malformed hook payload:", JSON.stringify(payload));
+      return NextResponse.json(
+        { error: { http_code: 400, message: "Malformed payload." } },
+        { status: 400 }
+      );
+    }
 
-  try {
+    const { token_hash, redirect_to, email_action_type } = email_data;
+
+    // Only signup / recovery / email_change are used by this app.
+    if (!SUBJECTS[email_action_type]) {
+      return NextResponse.json({ ok: true }); // nothing to send, don't error out
+    }
+
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      console.error("NEXT_PUBLIC_SUPABASE_URL is not set in this deployment's env vars.");
+      return NextResponse.json(
+        { error: { http_code: 500, message: "Server misconfigured: missing Supabase URL." } },
+        { status: 500 }
+      );
+    }
+
+    const confirmationUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/verify?token=${token_hash}&type=${email_action_type}&redirect_to=${encodeURIComponent(redirect_to)}`;
+
     await sendEmail({
       to: user.email,
       subject: SUBJECTS[email_action_type],
@@ -56,13 +80,13 @@ export async function POST(req: Request) {
         confirmationUrl,
       }),
     });
+
+    return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("Failed to send auth email:", err);
+    console.error("Unhandled error in send-email hook:", err);
     return NextResponse.json(
-      { error: { http_code: 500, message: "Failed to send email." } },
+      { error: { http_code: 500, message: err instanceof Error ? err.message : "Unknown error." } },
       { status: 500 }
     );
   }
-
-  return NextResponse.json({ ok: true });
 }
