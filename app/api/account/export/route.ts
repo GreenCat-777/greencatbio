@@ -13,7 +13,7 @@ export async function GET(req: Request) {
   if (!user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const [profileRes, vouchesRes, sentRes, receivedRes, commentsRes] = await Promise.all([
-    supabase.from("profiles").select("username, avatar_url, created_at").eq("id", user.id).maybeSingle(),
+    supabase.from("profiles").select("username, avatar_url, verified, created_at").eq("id", user.id).maybeSingle(),
     supabase.from("vouches").select("id, name, body, admin_approved, user_confirmed, admin_note, created_at").eq("email", user.email.toLowerCase()),
     supabase.from("messages").select("id, recipient_id, body, created_at, read_at").eq("sender_id", user.id),
     supabase.from("messages").select("id, sender_id, body, created_at, read_at").eq("recipient_id", user.id),
@@ -24,7 +24,7 @@ export async function GET(req: Request) {
     ok: true,
     account: {
       email: user.email,
-      email_verified: !!user.email_confirmed_at,
+      email_verified: !!profileRes.data?.verified,
       account_created: user.created_at,
     },
     profile: profileRes.data || null,

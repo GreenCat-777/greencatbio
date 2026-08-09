@@ -28,12 +28,13 @@ export async function POST(req: Request) {
     if (authHeader?.startsWith("Bearer ")) {
       const token = authHeader.slice(7);
       const { data: userData } = await supabase.auth.getUser(token);
-      if (
-        userData?.user &&
-        userData.user.email_confirmed_at &&
-        userData.user.email?.toLowerCase() === email.trim().toLowerCase()
-      ) {
-        preConfirmed = true;
+      if (userData?.user && userData.user.email?.toLowerCase() === email.trim().toLowerCase()) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("verified")
+          .eq("id", userData.user.id)
+          .maybeSingle();
+        if (profile?.verified) preConfirmed = true;
       }
     }
 

@@ -4,7 +4,9 @@ import { useEffect, useState, useCallback } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabaseBrowser } from "@/lib/supabase-browser";
 
-export type Profile = { id: string; username: string; avatar_url: string | null };
+export type Profile = { id: string; username: string; avatar_url: string | null; verified: boolean };
+// "needs-username" kept only as a safety fallback for any old profile-less accounts;
+// normal signup now creates username + profile atomically server-side.
 export type AccountState = "loading" | "signed-out" | "needs-username" | "ready";
 
 export function useAccount() {
@@ -15,7 +17,7 @@ export function useAccount() {
   const loadProfile = useCallback(async (userId: string) => {
     const { data } = await supabaseBrowser
       .from("profiles")
-      .select("id, username, avatar_url")
+      .select("id, username, avatar_url, verified")
       .eq("id", userId)
       .maybeSingle();
     return data as Profile | null;
@@ -50,9 +52,9 @@ export function useAccount() {
     if (!session) throw new Error("Not signed in.");
     const { error } = await supabaseBrowser
       .from("profiles")
-      .insert([{ id: session.user.id, username }]);
+      .insert([{ id: session.user.id, username, verified: false }]);
     if (error) throw error;
-    setProfile({ id: session.user.id, username, avatar_url: null });
+    setProfile({ id: session.user.id, username, avatar_url: null, verified: false });
     setState("ready");
   }
 

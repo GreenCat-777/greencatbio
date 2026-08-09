@@ -5,7 +5,13 @@ async function getVerifiedEmail(req: Request, supabase: ReturnType<typeof create
   const authHeader = req.headers.get("authorization");
   if (!authHeader?.startsWith("Bearer ")) return null;
   const { data } = await supabase.auth.getUser(authHeader.slice(7));
-  if (!data?.user?.email_confirmed_at || !data.user.email) return null;
+  if (!data?.user?.email) return null;
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("verified")
+    .eq("id", data.user.id)
+    .maybeSingle();
+  if (!profile?.verified) return null;
   return data.user.email.toLowerCase();
 }
 
