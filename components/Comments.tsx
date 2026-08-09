@@ -1,13 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
 import { useAccount } from "@/lib/use-account";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabaseBrowser as supabase } from "@/lib/supabase-browser";
 
 type Comment = {
   id: string;
@@ -94,6 +89,25 @@ export default function Comments() {
     }
   }
 
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  async function deleteComment(id: string) {
+    if (!session) return;
+    if (!confirm("Delete this comment?")) return;
+    setDeletingId(id);
+    try {
+      const res = await fetch("/api/comments", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ id }),
+      });
+      if (res.ok) setComments((c) => c.filter((x) => x.id !== id));
+    } catch {
+      // silent — non-critical UI action
+    }
+    setDeletingId(null);
+  }
+
   const css = `
     .gc-comments { font-family: monospace; color: #0ed145; border: 2px solid #0ed145; border-radius: 12px; padding: 1.5rem; background: rgba(0,0,0,0.5); box-shadow: 0 0 24px rgba(14,209,69,0.25); }
     .gc-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: 1px solid rgba(14,209,69,0.2); }
@@ -127,6 +141,9 @@ export default function Comments() {
     .gc-meta { display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 0.3rem; }
     .gc-uname { font-weight: bold; font-size: 0.85rem; }
     .gc-verified-badge { font-size: 0.62rem; padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(14,209,69,0.5); color: rgba(14,209,69,0.7); font-weight: bold; }
+    .gc-delete-btn { margin-left: auto; background: transparent; border: none; color: rgba(255,85,85,0.5); cursor: pointer; font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; transition: all 0.15s; }
+    .gc-delete-btn:hover:not(:disabled) { color: #ff5555; background: rgba(255,85,85,0.1); }
+    .gc-delete-btn:disabled { opacity: 0.4; cursor: not-allowed; }
     .gc-time { font-size: 0.7rem; opacity: 0.4; }
     .gc-body { font-size: 0.875rem; line-height: 1.55; opacity: 0.88; white-space: pre-wrap; word-break: break-word; margin: 0; }
     .gc-hint { font-size: 0.7rem; opacity: 0.3; }
@@ -203,6 +220,15 @@ export default function Comments() {
                     <span className="gc-uname">{c.username}</span>
                     {c.user_id && <span className="gc-verified-badge">✓ verified</span>}
                     <span className="gc-time">{timeAgo(c.created_at)}</span>
+                    {session && c.user_id === session.user.id && (
+                      <button
+                        className="gc-delete-btn"
+                        onClick={() => deleteComment(c.id)}
+                        disabled={deletingId === c.id}
+                      >
+                        {deletingId === c.id ? "..." : "✕"}
+                      </button>
+                    )}
                   </div>
                   <p className="gc-body">{c.body}</p>
                 </div>

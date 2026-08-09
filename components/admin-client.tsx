@@ -625,6 +625,10 @@ function MessagesPanel() {
   const [activeConvo, setActiveConvo] = useState<Conversation | null>(null);
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
+  const [newChatOpen, setNewChatOpen] = useState(false);
+  const [newChatUsername, setNewChatUsername] = useState("");
+  const [newChatError, setNewChatError] = useState<string | null>(null);
+  const [newChatLoading, setNewChatLoading] = useState(false);
 
   const css = `
     .ad-wrap { font-family:monospace; color:#0ed145; }
@@ -725,6 +729,31 @@ function MessagesPanel() {
     }
   }
 
+  async function startNewChat() {
+    setNewChatError(null);
+    const uname = newChatUsername.trim().replace(/^@/, "");
+    if (!uname) return setNewChatError("Enter a username.");
+
+    setNewChatLoading(true);
+    try {
+      const res = await fetch("/api/admin/users");
+      const data = await res.json();
+      const match = (data.users || []).find(
+        (u: { username: string | null }) => u.username?.toLowerCase() === uname.toLowerCase()
+      );
+      if (!match) {
+        setNewChatError("No account with that username.");
+      } else {
+        setActiveConvo({ otherId: match.id, otherUsername: match.username, lastBody: "", lastAt: new Date().toISOString(), unread: false });
+        setNewChatOpen(false);
+        setNewChatUsername("");
+      }
+    } catch {
+      setNewChatError("Failed to look up user.");
+    }
+    setNewChatLoading(false);
+  }
+
   async function sendReply() {
     if (!activeConvo || !reply.trim()) return;
     setSending(true);
@@ -773,6 +802,28 @@ function MessagesPanel() {
 
         {!activeConvo ? (
           <>
+            {!newChatOpen ? (
+              <button className="ad-refresh" style={{ marginBottom: "1rem" }} onClick={() => setNewChatOpen(true)}>
+                + Reach out to a user
+              </button>
+            ) : (
+              <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
+                <input
+                  className="ad-reply-input"
+                  style={{ flex: 1 }}
+                  type="text"
+                  placeholder="username to message"
+                  value={newChatUsername}
+                  onChange={(e) => setNewChatUsername(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && startNewChat()}
+                />
+                <button className="ad-btn ad-btn-approve" onClick={startNewChat} disabled={newChatLoading}>
+                  {newChatLoading ? "..." : "Go"}
+                </button>
+              </div>
+            )}
+            {newChatError && <p className="ad-msg-err" style={{ fontSize: "0.78rem", color: "#ff5555", marginBottom: "0.75rem" }}>⚠ {newChatError}</p>}
+
             <div className="ad-stats">
               <div className="ad-stat">
                 <div className="ad-stat-val">{conversations.length}</div>
@@ -856,14 +907,154 @@ function MessagesPanel() {
   );
 }
 
+// ── COMMENTS PANEL ──────────────────────────────────────────────
+type CommentRow = {
+  id: string;
+  username: string;
+  body: string;
+  created_at: string;
+  user_id: string | null;
+};
+
+function CommentsPanel() {
+  const [comments, setComments] = useState<CommentRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const css = `
+    .ad-wrap { font-family:monospace; color:#0ed145; }
+    .ad-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.25rem; padding-bottom:0.75rem; border-bottom:1px solid rgba(14,209,69,0.2); flex-wrap:wrap; gap:0.5rem; }
+    .ad-title { font-size:1.1rem; font-weight:bold; letter-spacing:0.06em; }
+    .ad-refresh { padding:4px 14px; border:1px solid rgba(14,209,69,0.4); border-radius:5px; background:transparent; color:rgba(14,209,69,0.6); font-family:monospace; font-size:0.78rem; cursor:pointer; transition:all 0.15s; }
+    .ad-refresh:hover { border-color:#0ed145; color:#0ed145; }
+    .ad-box { border:2px solid #0ed145; border-radius:12px; padding:1.5rem; background:rgba(0,0,0,0.5); box-shadow:0 0 24px rgba(14,209,69,0.25); }
+    .ad-list { display:flex; flex-direction:column; gap:0.85rem; }
+    .ad-empty { opacity:0.4; font-size:0.85rem; text-align:center; padding:2rem 0; }
+    .ad-item { border:1px solid rgba(14,209,69,0.2); border-radius:8px; padding:1rem; background:rgba(14,209,69,0.02); }
+    .ad-row1 { display:flex; align-items:baseline; gap:0.75rem; margin-bottom:6px; flex-wrap:wrap; }
+    .ad-name { font-weight:bold; font-size:0.9rem; }
+    .ad-time { font-size:0.7rem; opacity:0.4; }
+    .ad-badge-confirmed { font-size:0.65rem; padding:1px 7px; border-radius:4px; border:1px solid rgba(14,209,69,0.5); color:rgba(14,209,69,0.7); font-weight:bold; }
+    .ad-badge-unconfirmed { font-size:0.65rem; padding:1px 7px; border-radius:4px; border:1px solid rgba(14,209,69,0.2); color:rgba(14,209,69,0.35); }
+    .ad-body { font-size:0.85rem; line-height:1.6; opacity:0.8; white-space:pre-wrap; word-break:break-word; margin:0 0 10px; }
+    .ad-actions { display:flex; gap:0.4rem; flex-wrap:wrap; }
+    .ad-btn { padding:4px 14px; border-radius:5px; font-family:monospace; font-size:0.78rem; font-weight:bold; cursor:pointer; transition:all 0.15s; border:1px solid; letter-spacing:0.04em; }
+    .ad-btn:disabled { opacity:0.4; cursor:not-allowed; }
+    .ad-btn-delete { border-color:rgba(255,85,85,0.4); color:rgba(255,85,85,0.7); background:transparent; }
+    .ad-btn-delete:hover:not(:disabled) { background:rgba(255,85,85,0.15); border-color:#ff5555; color:#ff5555; }
+    .ad-toast { position:fixed; bottom:24px; right:24px; background:#0ed145; color:#000; font-family:monospace; font-size:0.85rem; font-weight:bold; padding:10px 20px; border-radius:8px; box-shadow:0 0 20px rgba(14,209,69,0.5); z-index:9999; animation:ad-fadein 0.2s ease; }
+    @keyframes ad-fadein { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+    .ad-spinner { display:inline-block; width:12px; height:12px; border:1px solid rgba(14,209,69,0.3); border-top-color:#0ed145; border-radius:50%; animation:ad-spin 0.7s linear infinite; margin-right:4px; vertical-align:middle; }
+    @keyframes ad-spin { to{transform:rotate(360deg)} }
+    .ad-stats { display:flex; gap:0.75rem; margin-bottom:1.25rem; flex-wrap:wrap; }
+    .ad-stat { border:1px solid rgba(14,209,69,0.2); border-radius:6px; padding:8px 14px; background:rgba(14,209,69,0.03); }
+    .ad-stat-val { font-size:1.4rem; font-weight:bold; line-height:1; }
+    .ad-stat-label { font-size:0.68rem; opacity:0.4; margin-top:2px; letter-spacing:0.06em; }
+  `;
+
+  const fetchComments = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/comments");
+      const data = await res.json();
+      if (data.comments) setComments(data.comments);
+    } catch {
+      showToast("Failed to load comments.");
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchComments(); }, [fetchComments]);
+
+  function showToast(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
+  }
+
+  async function deleteComment(id: string) {
+    if (!confirm("Permanently delete this comment?")) return;
+    setActionLoading(id);
+    try {
+      await fetch("/api/admin/comments", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      setComments((c) => c.filter((x) => x.id !== id));
+      showToast("✓ Comment deleted.");
+    } catch {
+      showToast("Error deleting comment.");
+    }
+    setActionLoading(null);
+  }
+
+  return (
+    <div className="ad-wrap">
+      <style>{css}</style>
+      <div className="ad-box">
+        <div className="ad-header">
+          <div>
+            <p style={{ margin: "0 0 2px", fontSize: "0.78rem", opacity: 0.45, letterSpacing: "0.08em" }}>greencat777@bio:~$</p>
+            <span className="ad-title">// ADMIN DASHBOARD — COMMENTS</span>
+          </div>
+          <button className="ad-refresh" onClick={fetchComments}>↺ refresh</button>
+        </div>
+
+        <div className="ad-stats">
+          <div className="ad-stat">
+            <div className="ad-stat-val">{comments.length}</div>
+            <div className="ad-stat-label">TOTAL COMMENTS</div>
+          </div>
+          <div className="ad-stat">
+            <div className="ad-stat-val">{comments.filter((c) => c.user_id).length}</div>
+            <div className="ad-stat-label">FROM ACCOUNTS</div>
+          </div>
+        </div>
+
+        <div className="ad-list">
+          {loading ? (
+            <p className="ad-empty"><span className="ad-spinner" />loading...</p>
+          ) : comments.length === 0 ? (
+            <p className="ad-empty">No comments yet.</p>
+          ) : (
+            comments.map((c) => (
+              <div key={c.id} className="ad-item">
+                <div className="ad-row1">
+                  <span className="ad-name">{c.username}</span>
+                  <span className="ad-time">{timeAgo(c.created_at)}</span>
+                  {c.user_id
+                    ? <span className="ad-badge-confirmed">✓ verified</span>
+                    : <span className="ad-badge-unconfirmed">guest</span>}
+                </div>
+                <p className="ad-body">{c.body}</p>
+                <div className="ad-actions">
+                  <button
+                    className="ad-btn ad-btn-delete"
+                    onClick={() => deleteComment(c.id)}
+                    disabled={!!actionLoading}
+                  >
+                    {actionLoading === c.id ? <><span className="ad-spinner" />deleting...</> : "✕ Delete"}
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+      {toast && <div className="ad-toast">{toast}</div>}
+    </div>
+  );
+}
+
 // ── ADMIN SHELL (section tabs) ───────────────────────────────────
-type Section = "vouches" | "accounts" | "messages";
+type Section = "vouches" | "accounts" | "messages" | "comments";
 
 function AdminShell() {
   const [section, setSection] = useState<Section>("vouches");
 
   const shellCss = `
-    .ash-tabs { display:flex; gap:0.5rem; margin-bottom:1rem; font-family:monospace; }
+    .ash-tabs { display:flex; gap:0.5rem; margin-bottom:1rem; font-family:monospace; flex-wrap:wrap; }
     .ash-tab { padding:6px 18px; border:1px solid rgba(14,209,69,0.35); border-radius:6px; background:transparent; color:rgba(14,209,69,0.55); font-family:monospace; font-size:0.82rem; font-weight:bold; cursor:pointer; letter-spacing:0.05em; transition:all 0.15s; }
     .ash-tab:hover { border-color:#0ed145; color:#0ed145; }
     .ash-tab-active { border-color:#0ed145; background:#0ed145; color:#000; }
@@ -882,10 +1073,14 @@ function AdminShell() {
         <button className={`ash-tab${section === "messages" ? " ash-tab-active" : ""}`} onClick={() => setSection("messages")}>
           MESSAGES
         </button>
+        <button className={`ash-tab${section === "comments" ? " ash-tab-active" : ""}`} onClick={() => setSection("comments")}>
+          COMMENTS
+        </button>
       </div>
       {section === "vouches" && <Dashboard />}
       {section === "accounts" && <AccountsPanel />}
       {section === "messages" && <MessagesPanel />}
+      {section === "comments" && <CommentsPanel />}
     </div>
   );
 }

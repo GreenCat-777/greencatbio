@@ -1,13 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
 import { useAccount } from "@/lib/use-account";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabaseBrowser as supabase } from "@/lib/supabase-browser";
 
 type Vouch = {
   id: string;
@@ -202,8 +197,7 @@ export default function VouchesClient() {
       setName((n) => n || profile.username);
       setEmail((e) => e || session.user.email || "");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authState]);
+  }, [authState, session, profile]);
 
   async function fetchVouches() {
     setFetching(true);
