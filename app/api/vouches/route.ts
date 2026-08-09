@@ -21,20 +21,17 @@ export async function POST(req: Request) {
 
     const supabase = createServerSupabase();
 
-    // If the request carries a valid session for a verified account whose
-    // email matches, skip the email-confirmation step entirely.
+    // If the request carries a valid session for a real account whose
+    // email matches, skip the email-confirmation step entirely — being
+    // logged in at all is already proof of that email, regardless of
+    // whether they've clicked the separate account-verification link.
     let preConfirmed = false;
     const authHeader = req.headers.get("authorization");
     if (authHeader?.startsWith("Bearer ")) {
       const token = authHeader.slice(7);
       const { data: userData } = await supabase.auth.getUser(token);
       if (userData?.user && userData.user.email?.toLowerCase() === email.trim().toLowerCase()) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("verified")
-          .eq("id", userData.user.id)
-          .maybeSingle();
-        if (profile?.verified) preConfirmed = true;
+        preConfirmed = true;
       }
     }
 

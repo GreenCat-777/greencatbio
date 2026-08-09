@@ -9,17 +9,31 @@ export type Profile = { id: string; username: string; avatar_url: string | null;
 // normal signup now creates username + profile atomically server-side.
 export type AccountState = "loading" | "signed-out" | "needs-username" | "ready";
 
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("timed out")), ms);
+    promise.then(
+      (v) => { clearTimeout(timer); resolve(v); },
+      (e) => { clearTimeout(timer); reject(e); }
+    );
+  });
+}
+
 export function useAccount() {
   const [state, setState] = useState<AccountState>("loading");
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
 
   const loadProfile = useCallback(async (userId: string) => {
-    const { data } = await supabaseBrowser
+    const { data, error } = await supabaseBrowser
       .from("profiles")
       .select("id, username, avatar_url, verified")
       .eq("id", userId)
       .maybeSingle();
+    if (error) {
+      console.error("Failed to load profile:", error);
+      return null;
+    }
     return data as Profile | null;
   }, []);
 
@@ -31,12 +45,20 @@ export function useAccount() {
         setState("signed-out");
         return;
       }
-      const p = await loadProfile(sess.user.id);
-      if (!p) {
-        setState("needs-username");
-      } else {
-        setProfile(p);
-        setState("ready");
+      try {
+        const p = await withTimeout(loadProfile(sess.user.id), 8000);
+        if (!p) {
+          setState("needs-username");
+        } else {
+          setProfile(p);
+          setState("ready");
+        }
+      } catch (err) {
+        // Never leave the UI stuck on "loading" — fail safe to signed-out
+        // so the person can just try signing in again.
+        console.error("Account refresh failed or timed out:", err);
+        setProfile(null);
+        setState("signed-out");
       }
     },
     [loadProfile]
