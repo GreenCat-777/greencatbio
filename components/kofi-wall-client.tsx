@@ -59,7 +59,9 @@ function EntryOptionsModal({ entryName, onClose }: { entryName: string; onClose:
   return (
     <div className="kwm-overlay" onClick={onClose}>
       <div className="kwm-box" onClick={(e) => e.stopPropagation()}>
-        <button className="kwm-close" onClick={onClose} aria-label="Close">✕</button>
+        <button className="kwm-close" onClick={onClose} aria-label="Close">
+          ✕
+        </button>
 
         {step === "menu" && (
           <>
@@ -81,11 +83,17 @@ function EntryOptionsModal({ entryName, onClose }: { entryName: string; onClose:
             <p className="kwm-title">✎ Edit this entry</p>
             <p className="kwm-sub">
               If this is your Ko-fi and you wish to edit the description, name, profile image, or other, contact{" "}
-              <a href="/social" className="kwm-link">GreenCat</a>.
+              <a href="/social" className="kwm-link">
+                GreenCat
+              </a>.
             </p>
             <div className="kwm-btns kwm-btns-row">
-              <button className="kwm-btn kwm-btn-ghost" onClick={() => setStep("menu")}>← Back</button>
-              <a className="kwm-btn kwm-btn-cta" href="/social">→ Contact GreenCat</a>
+              <button className="kwm-btn kwm-btn-ghost" onClick={() => setStep("menu")}>
+                ← Back
+              </button>
+              <a className="kwm-btn kwm-btn-cta" href="/social">
+                → Contact GreenCat
+              </a>
             </div>
           </>
         )}
@@ -95,11 +103,17 @@ function EntryOptionsModal({ entryName, onClose }: { entryName: string; onClose:
             <p className="kwm-title">🗑 Remove this entry</p>
             <p className="kwm-sub">
               If this is your Ko-fi and you wish to remove it from the page, please contact{" "}
-              <a href="/social" className="kwm-link">GreenCat</a>.
+              <a href="/social" className="kwm-link">
+                GreenCat
+              </a>.
             </p>
             <div className="kwm-btns kwm-btns-row">
-              <button className="kwm-btn kwm-btn-ghost" onClick={() => setStep("menu")}>← Back</button>
-              <a className="kwm-btn kwm-btn-cta" href="/social">→ Contact GreenCat</a>
+              <button className="kwm-btn kwm-btn-ghost" onClick={() => setStep("menu")}>
+                ← Back
+              </button>
+              <a className="kwm-btn kwm-btn-cta" href="/social">
+                → Contact GreenCat
+              </a>
             </div>
           </>
         )}
@@ -126,7 +140,9 @@ export default function KofiWallClient() {
   const [submitted, setSubmitted] = useState(false);
   const [openOptionsFor, setOpenOptionsFor] = useState<KofiEntry | null>(null);
 
-  useEffect(() => { fetchEntries(); }, []);
+  useEffect(() => {
+    fetchEntries();
+  }, []);
 
   useEffect(() => {
     if (profile) {
@@ -143,6 +159,7 @@ export default function KofiWallClient() {
       .select("id, name, kofi_url, description, avatar_url")
       .eq("admin_approved", true)
       .order("name", { ascending: true });
+
     if (data) setEntries(data);
     setFetching(false);
   }
@@ -151,6 +168,7 @@ export default function KofiWallClient() {
     const file = e.target.files?.[0];
     if (!file) return;
     setAvatarError(null);
+
     try {
       const b64 = await resizeImageToBase64(file);
       setAvatarPreview(b64);
@@ -161,14 +179,18 @@ export default function KofiWallClient() {
 
   async function handleSubmit() {
     setError(null);
+
     if (!name.trim()) return setError("Name is required.");
     if (!kofiUrl.trim()) return setError("Ko-fi link is required.");
     if (!/^https?:\/\//.test(kofiUrl.trim())) return setError("Ko-fi link must start with https://");
     if (!description.trim()) return setError("Description is required.");
     if (description.length > 500) return setError("Description too long (max 500 chars).");
-    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return setError("Invalid email.");
+    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      return setError("Invalid email.");
+    }
 
     setLoading(true);
+
     try {
       const res = await fetch("/api/kofi-wall", {
         method: "POST",
@@ -181,16 +203,23 @@ export default function KofiWallClient() {
           avatar_base64: avatarPreview?.startsWith("data:") ? avatarPreview : undefined,
         }),
       });
+
       const data = await res.json();
+
       if (!res.ok) {
         setError(data.error || "Submission failed.");
       } else {
         setSubmitted(true);
-        setName(""); setKofiUrl(""); setDescription(""); setEmail(""); setAvatarPreview(null);
+        setName("");
+        setKofiUrl("");
+        setDescription("");
+        setEmail("");
+        setAvatarPreview(null);
       }
     } catch {
       setError("Network error. Please try again.");
     }
+
     setLoading(false);
   }
 
@@ -238,7 +267,10 @@ export default function KofiWallClient() {
     .kw-avatar-img { width:64px; height:64px; border-radius:50%; object-fit:cover; border:2px solid #0ed145; box-shadow:0 0 10px rgba(14,209,69,0.3); }
     .kw-avatar-fallback { width:64px; height:64px; border-radius:50%; border:2px solid #0ed145; background:rgba(14,209,69,0.08); display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:1.3rem; color:#0ed145; box-shadow:0 0 10px rgba(14,209,69,0.3); }
     .kw-card-name { font-weight:bold; font-size:0.95rem; word-break:break-word; }
-    .kw-card-desc { font-size:0.8rem; opacity:0.7; line-height:1.5; word-break:break-word; margin:0; display:-webkit-box; -webkit-line-clamp:4; line-clamp:4; -webkit-box-orient:vertical; box-orient:vertical; overflow:hidden; text-overflow:ellipsis; min-height:2.25em; }
+
+    /* Full descriptions — no line clamp or hidden overflow */
+    .kw-card-desc { font-size:0.8rem; opacity:0.7; line-height:1.5; word-break:break-word; margin:0; }
+
     .kw-card-btn { margin-top:auto; padding:0.45rem 1.1rem; border:2px solid #0ed145; border-radius:6px; background:transparent; color:#0ed145; font-family:monospace; font-size:0.78rem; font-weight:bold; text-decoration:none; letter-spacing:0.03em; transition:background 0.15s, color 0.15s; }
     .kw-card-btn:hover { background:#0ed145; color:#000; }
     .kwm-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.75); display:flex; align-items:center; justify-content:center; z-index:9999; padding:1rem; }
@@ -262,6 +294,7 @@ export default function KofiWallClient() {
   return (
     <>
       <style>{css}</style>
+
       <div className="kw-wrap">
         <div className="kw-header">
           <span className="kw-dot" />
@@ -269,7 +302,9 @@ export default function KofiWallClient() {
           <span className="kw-count">
             {fetching ? "..." : `${entries.length} ${entries.length === 1 ? "entry" : "entries"}`}
           </span>
-          <a href="/" className="kw-home">← home</a>
+          <a href="/" className="kw-home">
+            ← home
+          </a>
         </div>
 
         <p className="kw-intro">
@@ -279,7 +314,9 @@ export default function KofiWallClient() {
         {submitted ? (
           <div className="kw-success-box">
             <p className="kw-success-title">✓ Submitted!</p>
-            <p className="kw-success-sub">Your entry is pending review and will appear here once approved.</p>
+            <p className="kw-success-sub">
+              Your entry is pending review and will appear here once approved.
+            </p>
           </div>
         ) : formOpen ? (
           <div className="kw-form">
@@ -292,11 +329,18 @@ export default function KofiWallClient() {
               ) : (
                 <div className="kw-avatar-placeholder">no pic</div>
               )}
+
               <label className="kw-file-btn">
                 {avatarPreview ? "change photo" : "upload photo (optional)"}
-                <input type="file" accept="image/*" onChange={handleAvatarChange} style={{ display: "none" }} />
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarChange}
+                  style={{ display: "none" }}
+                />
               </label>
             </div>
+
             {avatarError && <p className="kw-error">⚠ {avatarError}</p>}
 
             <input
@@ -307,6 +351,7 @@ export default function KofiWallClient() {
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
+
             <input
               className="kw-input"
               type="url"
@@ -314,6 +359,7 @@ export default function KofiWallClient() {
               value={kofiUrl}
               onChange={(e) => setKofiUrl(e.target.value)}
             />
+
             <textarea
               className="kw-textarea"
               placeholder="what do you do in the Kindle community? (max 500 chars)"
@@ -322,7 +368,9 @@ export default function KofiWallClient() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
+
             <p className="kw-char">{description.length}/500</p>
+
             <input
               className="kw-input"
               type="email"
@@ -330,14 +378,25 @@ export default function KofiWallClient() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
+
             <span className="kw-hint">🔒 email is never shown publicly</span>
 
             <div className="kw-footer">
               <span>{error && <span className="kw-error">⚠ {error}</span>}</span>
+
               <div style={{ display: "flex", gap: "0.5rem" }}>
-                <button className="kw-btn" style={{ borderColor: "rgba(14,209,69,0.3)", color: "rgba(14,209,69,0.6)" }} onClick={() => setFormOpen(false)} disabled={loading}>
+                <button
+                  className="kw-btn"
+                  style={{
+                    borderColor: "rgba(14,209,69,0.3)",
+                    color: "rgba(14,209,69,0.6)",
+                  }}
+                  onClick={() => setFormOpen(false)}
+                  disabled={loading}
+                >
                   cancel
                 </button>
+
                 <button className="kw-btn" onClick={handleSubmit} disabled={loading}>
                   {loading ? "sending..." : "→ submit entry"}
                 </button>
@@ -365,9 +424,15 @@ export default function KofiWallClient() {
                 >
                   ⋮
                 </button>
+
                 <Avatar name={entry.name} url={entry.avatar_url} />
+
                 <p className="kw-card-name">{entry.name}</p>
-                <p className="kw-card-desc" title={entry.description}>{entry.description}</p>
+
+                <p className="kw-card-desc" title={entry.description}>
+                  {entry.description}
+                </p>
+
                 <a
                   className="kw-card-btn"
                   href={entry.kofi_url}
