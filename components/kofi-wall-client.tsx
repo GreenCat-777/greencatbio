@@ -238,7 +238,7 @@ export default function KofiWallClient() {
     .kw-avatar-img { width:64px; height:64px; border-radius:50%; object-fit:cover; border:2px solid #0ed145; box-shadow:0 0 10px rgba(14,209,69,0.3); }
     .kw-avatar-fallback { width:64px; height:64px; border-radius:50%; border:2px solid #0ed145; background:rgba(14,209,69,0.08); display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:1.3rem; color:#0ed145; box-shadow:0 0 10px rgba(14,209,69,0.3); }
     .kw-card-name { font-weight:bold; font-size:0.95rem; word-break:break-word; }
-    .kw-card-desc { font-size:0.8rem; opacity:0.7; line-height:1.5; word-break:break-word; margin:0; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; min-height:2.25em; }
+    .kw-card-desc { font-size:0.8rem; opacity:0.7; line-height:1.5; word-break:break-word; margin:0; display:-webkit-box; -webkit-line-clamp:4; line-clamp:4; -webkit-box-orient:vertical; box-orient:vertical; overflow:hidden; text-overflow:ellipsis; min-height:2.25em; }
     .kw-card-btn { margin-top:auto; padding:0.45rem 1.1rem; border:2px solid #0ed145; border-radius:6px; background:transparent; color:#0ed145; font-family:monospace; font-size:0.78rem; font-weight:bold; text-decoration:none; letter-spacing:0.03em; transition:background 0.15s, color 0.15s; }
     .kw-card-btn:hover { background:#0ed145; color:#000; }
     .kwm-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.75); display:flex; align-items:center; justify-content:center; z-index:9999; padding:1rem; }
