@@ -1047,8 +1047,439 @@ function CommentsPanel() {
   );
 }
 
+// ── KOFI WALL PANEL ───────────────────────────────────────────────
+type KofiEntry = {
+  id: string;
+  name: string;
+  kofi_url: string;
+  description: string;
+  avatar_url: string | null;
+  email: string | null;
+  admin_approved: boolean;
+  added_by_admin: boolean;
+  created_at: string;
+};
+
+const KW_MAX_AVATAR_DIM = 256;
+
+function kwResizeImageToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith("image/")) return reject(new Error("Not an image."));
+    if (file.size > 8 * 1024 * 1024) return reject(new Error("Image too large (max 8MB)."));
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const size = KW_MAX_AVATAR_DIM;
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return reject(new Error("Canvas unsupported."));
+        const minDim = Math.min(img.width, img.height);
+        const sx = (img.width - minDim) / 2;
+        const sy = (img.height - minDim) / 2;
+        ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, size, size);
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
+      };
+      img.onerror = () => reject(new Error("Couldn't read image."));
+      img.src = reader.result as string;
+    };
+    reader.onerror = () => reject(new Error("Couldn't read file."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function KwAvatar({ name, url }: { name: string; url: string | null }) {
+  if (url) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={url} alt={name} style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover", border: "2px solid #0ed145", boxShadow: "0 0 10px rgba(14,209,69,0.3)", flexShrink: 0 }} />;
+  }
+  return (
+    <div style={{
+      width: 44, height: 44, borderRadius: "50%",
+      border: "2px solid #0ed145", background: "rgba(14,209,69,0.08)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontFamily: "monospace", fontWeight: "bold", fontSize: 17,
+      color: "#0ed145", flexShrink: 0, boxShadow: "0 0 10px rgba(14,209,69,0.3)",
+    }}>
+      {name.charAt(0).toUpperCase()}
+    </div>
+  );
+}
+
+type KwDraft = { name: string; kofi_url: string; description: string; avatar_base64?: string; avatar_preview?: string };
+
+function KofiWallPanel() {
+  const [entries, setEntries] = useState<KofiEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<"all" | "pending" | "approved">("pending");
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const [addOpen, setAddOpen] = useState(false);
+  const [addDraft, setAddDraft] = useState<KwDraft>({ name: "", kofi_url: "", description: "" });
+  const [addError, setAddError] = useState<string | null>(null);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<KwDraft>({ name: "", kofi_url: "", description: "" });
+  const [editError, setEditError] = useState<string | null>(null);
+
+  const fetchEntries = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/kofi-wall");
+      const data = await res.json();
+      if (data.entries) setEntries(data.entries);
+    } catch {
+      showToast("Failed to load entries.");
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchEntries(); }, [fetchEntries]);
+
+  function showToast(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
+  }
+
+  async function approve(id: string) {
+    setActionLoading(id + "-approve");
+    try {
+      await fetch("/api/admin/kofi-wall", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, admin_approved: true }),
+      });
+      setEntries((v) => v.map((x) => x.id === id ? { ...x, admin_approved: true } : x));
+      showToast("✓ Entry approved and published.");
+    } catch { showToast("Error approving entry."); }
+    setActionLoading(null);
+  }
+
+  async function reject(id: string) {
+    setActionLoading(id + "-reject");
+    try {
+      await fetch("/api/admin/kofi-wall", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, admin_approved: false }),
+      });
+      setEntries((v) => v.map((x) => x.id === id ? { ...x, admin_approved: false } : x));
+      showToast("Entry unpublished.");
+    } catch { showToast("Error."); }
+    setActionLoading(null);
+  }
+
+  async function deleteEntry(id: string) {
+    if (!confirm("Permanently delete this entry?")) return;
+    setActionLoading(id + "-delete");
+    try {
+      await fetch("/api/admin/kofi-wall", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      setEntries((v) => v.filter((x) => x.id !== id));
+      showToast("Entry deleted.");
+    } catch { showToast("Error deleting."); }
+    setActionLoading(null);
+  }
+
+  function startEdit(entry: KofiEntry) {
+    setEditingId(entry.id);
+    setEditError(null);
+    setEditDraft({ name: entry.name, kofi_url: entry.kofi_url, description: entry.description, avatar_preview: entry.avatar_url ?? undefined });
+  }
+
+  async function handleEditAvatar(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const b64 = await kwResizeImageToBase64(file);
+      setEditDraft((d) => ({ ...d, avatar_base64: b64, avatar_preview: b64 }));
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "Couldn't process image.");
+    }
+  }
+
+  async function saveEdit(id: string) {
+    setEditError(null);
+    if (!editDraft.name.trim() || !editDraft.kofi_url.trim() || !editDraft.description.trim()) {
+      return setEditError("All fields are required.");
+    }
+    setActionLoading(id + "-edit");
+    try {
+      const res = await fetch("/api/admin/kofi-wall", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id,
+          name: editDraft.name.trim(),
+          kofi_url: editDraft.kofi_url.trim(),
+          description: editDraft.description.trim(),
+          avatar_base64: editDraft.avatar_base64,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setEditError(data.error || "Failed to save.");
+      } else {
+        setEntries((v) => v.map((x) => x.id === id ? {
+          ...x,
+          name: editDraft.name.trim(),
+          kofi_url: editDraft.kofi_url.trim(),
+          description: editDraft.description.trim(),
+          avatar_url: editDraft.avatar_base64 ? (editDraft.avatar_preview ?? x.avatar_url) : x.avatar_url,
+        } : x));
+        setEditingId(null);
+        showToast("✓ Entry updated.");
+        fetchEntries(); // pick up the real uploaded avatar_url
+      }
+    } catch {
+      setEditError("Network error.");
+    }
+    setActionLoading(null);
+  }
+
+  async function handleAddAvatar(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const b64 = await kwResizeImageToBase64(file);
+      setAddDraft((d) => ({ ...d, avatar_base64: b64, avatar_preview: b64 }));
+    } catch (err) {
+      setAddError(err instanceof Error ? err.message : "Couldn't process image.");
+    }
+  }
+
+  async function submitAdd() {
+    setAddError(null);
+    if (!addDraft.name.trim() || !addDraft.kofi_url.trim() || !addDraft.description.trim()) {
+      return setAddError("All fields are required.");
+    }
+    setActionLoading("add-new");
+    try {
+      const res = await fetch("/api/admin/kofi-wall", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: addDraft.name.trim(),
+          kofi_url: addDraft.kofi_url.trim(),
+          description: addDraft.description.trim(),
+          avatar_base64: addDraft.avatar_base64,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAddError(data.error || "Failed to add entry.");
+      } else {
+        setAddDraft({ name: "", kofi_url: "", description: "" });
+        setAddOpen(false);
+        showToast("✓ Entry added and published.");
+        fetchEntries();
+      }
+    } catch {
+      setAddError("Network error.");
+    }
+    setActionLoading(null);
+  }
+
+  const filtered = entries.filter((e) => {
+    if (filter === "pending") return !e.admin_approved;
+    if (filter === "approved") return e.admin_approved;
+    return true;
+  });
+
+  const counts = {
+    all: entries.length,
+    pending: entries.filter((e) => !e.admin_approved).length,
+    approved: entries.filter((e) => e.admin_approved).length,
+  };
+
+  const css = `
+    .ad-wrap { font-family:monospace; color:#0ed145; }
+    .ad-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.25rem; padding-bottom:0.75rem; border-bottom:1px solid rgba(14,209,69,0.2); flex-wrap:wrap; gap:0.5rem; }
+    .ad-title { font-size:1.1rem; font-weight:bold; letter-spacing:0.06em; }
+    .ad-refresh { padding:4px 14px; border:1px solid rgba(14,209,69,0.4); border-radius:5px; background:transparent; color:rgba(14,209,69,0.6); font-family:monospace; font-size:0.78rem; cursor:pointer; transition:all 0.15s; }
+    .ad-refresh:hover { border-color:#0ed145; color:#0ed145; }
+    .ad-box { border:2px solid #0ed145; border-radius:12px; padding:1.5rem; background:rgba(0,0,0,0.5); box-shadow:0 0 24px rgba(14,209,69,0.25); }
+    .ad-tabs { display:flex; gap:0.4rem; margin-bottom:1.25rem; }
+    .ad-tab { padding:5px 16px; border:1px solid rgba(14,209,69,0.3); border-radius:5px; background:transparent; color:rgba(14,209,69,0.5); font-family:monospace; font-size:0.8rem; cursor:pointer; transition:all 0.15s; }
+    .ad-tab:hover { border-color:#0ed145; color:#0ed145; }
+    .ad-tab-active { border-color:#0ed145; color:#000; background:#0ed145; }
+    .ad-badge { display:inline-block; margin-left:4px; background:rgba(14,209,69,0.15); border-radius:3px; padding:0 5px; font-size:0.7rem; }
+    .ad-tab-active .ad-badge { background:rgba(0,0,0,0.25); color:#000; }
+    .ad-list { display:flex; flex-direction:column; gap:0.85rem; }
+    .ad-empty { opacity:0.4; font-size:0.85rem; text-align:center; padding:2rem 0; }
+    .ad-item { border:1px solid rgba(14,209,69,0.2); border-radius:8px; padding:1rem; background:rgba(14,209,69,0.02); }
+    .ad-item-approved { border-color:rgba(14,209,69,0.4); background:rgba(14,209,69,0.04); }
+    .ad-row1 { display:flex; align-items:center; gap:0.75rem; margin-bottom:6px; flex-wrap:wrap; }
+    .ad-name { font-weight:bold; font-size:0.9rem; }
+    .ad-time { font-size:0.7rem; opacity:0.4; }
+    .ad-badge-confirmed { font-size:0.65rem; padding:1px 7px; border-radius:4px; border:1px solid rgba(14,209,69,0.5); color:rgba(14,209,69,0.7); font-weight:bold; }
+    .ad-badge-unconfirmed { font-size:0.65rem; padding:1px 7px; border-radius:4px; border:1px solid rgba(14,209,69,0.2); color:rgba(14,209,69,0.35); }
+    .ad-badge-live { font-size:0.65rem; padding:1px 7px; border-radius:4px; border:1px solid #0ed145; color:#0ed145; font-weight:bold; }
+    .ad-body { font-size:0.85rem; line-height:1.6; opacity:0.8; white-space:pre-wrap; word-break:break-word; margin:0 0 10px; }
+    .ad-actions { display:flex; gap:0.4rem; flex-wrap:wrap; }
+    .ad-btn { padding:4px 14px; border-radius:5px; font-family:monospace; font-size:0.78rem; font-weight:bold; cursor:pointer; transition:all 0.15s; border:1px solid; letter-spacing:0.04em; }
+    .ad-btn:disabled { opacity:0.4; cursor:not-allowed; }
+    .ad-btn-approve { border-color:rgba(14,209,69,0.5); color:rgba(14,209,69,0.8); background:transparent; }
+    .ad-btn-approve:hover:not(:disabled) { background:#0ed145; color:#000; border-color:#0ed145; }
+    .ad-btn-unapprove { border-color:rgba(255,200,0,0.5); color:rgba(255,200,0,0.8); background:transparent; }
+    .ad-btn-unapprove:hover:not(:disabled) { background:rgba(255,200,0,0.2); }
+    .ad-btn-delete { border-color:rgba(255,85,85,0.4); color:rgba(255,85,85,0.7); background:transparent; }
+    .ad-btn-delete:hover:not(:disabled) { background:rgba(255,85,85,0.15); border-color:#ff5555; color:#ff5555; }
+    .ad-btn-edit { border-color:rgba(14,209,69,0.3); color:rgba(14,209,69,0.6); background:transparent; }
+    .ad-btn-edit:hover:not(:disabled) { border-color:#0ed145; color:#0ed145; }
+    .ad-toast { position:fixed; bottom:24px; right:24px; background:#0ed145; color:#000; font-family:monospace; font-size:0.85rem; font-weight:bold; padding:10px 20px; border-radius:8px; box-shadow:0 0 20px rgba(14,209,69,0.5); z-index:9999; animation:ad-fadein 0.2s ease; }
+    @keyframes ad-fadein { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+    .ad-spinner { display:inline-block; width:12px; height:12px; border:1px solid rgba(14,209,69,0.3); border-top-color:#0ed145; border-radius:50%; animation:ad-spin 0.7s linear infinite; margin-right:4px; vertical-align:middle; }
+    @keyframes ad-spin { to{transform:rotate(360deg)} }
+    .ad-stats { display:flex; gap:0.75rem; margin-bottom:1.25rem; flex-wrap:wrap; }
+    .ad-stat { border:1px solid rgba(14,209,69,0.2); border-radius:6px; padding:8px 14px; background:rgba(14,209,69,0.03); }
+    .ad-stat-val { font-size:1.4rem; font-weight:bold; line-height:1; }
+    .ad-stat-label { font-size:0.68rem; opacity:0.4; margin-top:2px; letter-spacing:0.06em; }
+    .kw-add-toggle { padding:5px 16px; border:1px dashed rgba(14,209,69,0.4); border-radius:6px; background:transparent; color:rgba(14,209,69,0.7); font-family:monospace; font-size:0.8rem; cursor:pointer; margin-bottom:1.25rem; transition:all 0.15s; }
+    .kw-add-toggle:hover { border-color:#0ed145; color:#0ed145; }
+    .kw-add-box { border:1px solid rgba(14,209,69,0.3); border-radius:8px; padding:1rem; margin-bottom:1.25rem; background:rgba(14,209,69,0.03); display:flex; flex-direction:column; gap:0.6rem; }
+    .kw-field-input { width:100%; background:transparent; border:1px solid rgba(14,209,69,0.35); border-radius:6px; padding:0.5rem 0.75rem; color:#0ed145; font-family:monospace; font-size:0.85rem; outline:none; box-sizing:border-box; }
+    .kw-field-input:focus { border-color:#0ed145; box-shadow:0 0 8px rgba(14,209,69,0.25); }
+    .kw-field-textarea { width:100%; background:transparent; border:1px solid rgba(14,209,69,0.35); border-radius:6px; padding:0.5rem 0.75rem; color:#0ed145; font-family:monospace; font-size:0.85rem; outline:none; resize:vertical; min-height:60px; box-sizing:border-box; }
+    .kw-field-textarea:focus { border-color:#0ed145; box-shadow:0 0 8px rgba(14,209,69,0.25); }
+    .kw-avatar-row { display:flex; align-items:center; gap:0.75rem; }
+    .kw-file-btn { padding:0.35rem 0.9rem; border:1px solid rgba(14,209,69,0.4); border-radius:6px; background:transparent; color:rgba(14,209,69,0.8); font-family:monospace; font-size:0.75rem; cursor:pointer; transition:all 0.15s; }
+    .kw-file-btn:hover { border-color:#0ed145; color:#0ed145; }
+  `;
+
+  return (
+    <>
+      <style>{css}</style>
+      <div className="ad-wrap">
+        <div className="ad-box">
+          <div className="ad-header">
+            <div>
+              <p style={{ margin: "0 0 2px", fontSize: "0.78rem", opacity: 0.45, letterSpacing: "0.08em" }}>greencat777@bio:~$</p>
+              <span className="ad-title">// ADMIN DASHBOARD — KO-FI WALL</span>
+            </div>
+            <button className="ad-refresh" onClick={fetchEntries}>↺ refresh</button>
+          </div>
+
+          <div className="ad-stats">
+            <div className="ad-stat"><div className="ad-stat-val">{counts.all}</div><div className="ad-stat-label">TOTAL</div></div>
+            <div className="ad-stat"><div className="ad-stat-val">{counts.pending}</div><div className="ad-stat-label">PENDING</div></div>
+            <div className="ad-stat"><div className="ad-stat-val">{counts.approved}</div><div className="ad-stat-label">APPROVED</div></div>
+          </div>
+
+          {!addOpen ? (
+            <button className="kw-add-toggle" onClick={() => setAddOpen(true)}>+ add entry directly (auto-published)</button>
+          ) : (
+            <div className="kw-add-box">
+              <div className="kw-avatar-row">
+                <KwAvatar name={addDraft.name || "?"} url={addDraft.avatar_preview ?? null} />
+                <label className="kw-file-btn">
+                  upload photo
+                  <input type="file" accept="image/*" onChange={handleAddAvatar} style={{ display: "none" }} />
+                </label>
+              </div>
+              <input className="kw-field-input" placeholder="name" value={addDraft.name} onChange={(e) => setAddDraft((d) => ({ ...d, name: e.target.value }))} />
+              <input className="kw-field-input" placeholder="ko-fi link (https://ko-fi.com/...)" value={addDraft.kofi_url} onChange={(e) => setAddDraft((d) => ({ ...d, kofi_url: e.target.value }))} />
+              <textarea className="kw-field-textarea" rows={2} placeholder="description" value={addDraft.description} onChange={(e) => setAddDraft((d) => ({ ...d, description: e.target.value }))} />
+              {addError && <p className="ad-note-dirty" style={{ color: "#ff5555" }}>⚠ {addError}</p>}
+              <div className="ad-actions">
+                <button className="ad-btn ad-btn-approve" onClick={submitAdd} disabled={actionLoading === "add-new"}>
+                  {actionLoading === "add-new" ? <><span className="ad-spinner" />adding...</> : "✓ Publish entry"}
+                </button>
+                <button className="ad-btn ad-btn-edit" onClick={() => { setAddOpen(false); setAddError(null); }}>cancel</button>
+              </div>
+            </div>
+          )}
+
+          <div className="ad-tabs">
+            {(["pending", "approved", "all"] as const).map((tab) => (
+              <button key={tab} className={`ad-tab${filter === tab ? " ad-tab-active" : ""}`} onClick={() => setFilter(tab)}>
+                {tab.toUpperCase()}
+                <span className="ad-badge">{counts[tab]}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="ad-list">
+            {loading ? (
+              <p className="ad-empty"><span className="ad-spinner" />loading...</p>
+            ) : filtered.length === 0 ? (
+              <p className="ad-empty">No {filter === "all" ? "" : filter} entries.</p>
+            ) : (
+              filtered.map((entry) => (
+                <div key={entry.id} className={`ad-item${entry.admin_approved ? " ad-item-approved" : ""}`}>
+                  {editingId === entry.id ? (
+                    <>
+                      <div className="kw-avatar-row" style={{ marginBottom: 8 }}>
+                        <KwAvatar name={editDraft.name || "?"} url={editDraft.avatar_preview ?? null} />
+                        <label className="kw-file-btn">
+                          change photo
+                          <input type="file" accept="image/*" onChange={handleEditAvatar} style={{ display: "none" }} />
+                        </label>
+                      </div>
+                      <input className="kw-field-input" style={{ marginBottom: 6 }} value={editDraft.name} onChange={(e) => setEditDraft((d) => ({ ...d, name: e.target.value }))} />
+                      <input className="kw-field-input" style={{ marginBottom: 6 }} value={editDraft.kofi_url} onChange={(e) => setEditDraft((d) => ({ ...d, kofi_url: e.target.value }))} />
+                      <textarea className="kw-field-textarea" style={{ marginBottom: 6 }} rows={2} value={editDraft.description} onChange={(e) => setEditDraft((d) => ({ ...d, description: e.target.value }))} />
+                      {editError && <p style={{ color: "#ff5555", fontSize: "0.75rem", margin: "0 0 6px" }}>⚠ {editError}</p>}
+                      <div className="ad-actions">
+                        <button className="ad-btn ad-btn-approve" onClick={() => saveEdit(entry.id)} disabled={!!actionLoading}>
+                          {actionLoading === entry.id + "-edit" ? <><span className="ad-spinner" />saving...</> : "💾 Save"}
+                        </button>
+                        <button className="ad-btn ad-btn-edit" onClick={() => setEditingId(null)} disabled={!!actionLoading}>cancel</button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="ad-row1">
+                        <KwAvatar name={entry.name} url={entry.avatar_url} />
+                        <span className="ad-name">{entry.name}</span>
+                        <span className="ad-time">{timeAgo(entry.created_at)}</span>
+                        {entry.admin_approved && <span className="ad-badge-live">● LIVE</span>}
+                        {entry.added_by_admin
+                          ? <span className="ad-badge-confirmed">added by admin</span>
+                          : <span className="ad-badge-unconfirmed">public submission</span>}
+                      </div>
+                      <div style={{ fontSize: "0.75rem", opacity: 0.5, margin: "0 0 6px" }}>
+                        ☕ <a href={entry.kofi_url} target="_blank" rel="noopener noreferrer" style={{ color: "#0ed145" }}>{entry.kofi_url}</a>
+                      </div>
+                      {entry.email && <div style={{ fontSize: "0.75rem", opacity: 0.4, marginBottom: "8px" }}>✉ {entry.email}</div>}
+                      <p className="ad-body">{entry.description}</p>
+                      <div className="ad-actions">
+                        {!entry.admin_approved ? (
+                          <button className="ad-btn ad-btn-approve" onClick={() => approve(entry.id)} disabled={!!actionLoading}>
+                            {actionLoading === entry.id + "-approve" ? <><span className="ad-spinner" />approving...</> : "✓ Approve"}
+                          </button>
+                        ) : (
+                          <button className="ad-btn ad-btn-unapprove" onClick={() => reject(entry.id)} disabled={!!actionLoading}>
+                            {actionLoading === entry.id + "-reject" ? <><span className="ad-spinner" />saving...</> : "⊘ Unpublish"}
+                          </button>
+                        )}
+                        <button className="ad-btn ad-btn-edit" onClick={() => startEdit(entry)} disabled={!!actionLoading}>✎ Edit</button>
+                        <button className="ad-btn ad-btn-delete" onClick={() => deleteEntry(entry.id)} disabled={!!actionLoading}>
+                          {actionLoading === entry.id + "-delete" ? <><span className="ad-spinner" />deleting...</> : "✕ Delete"}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+      {toast && <div className="ad-toast">{toast}</div>}
+    </>
+  );
+}
+
 // ── ADMIN SHELL (section tabs) ───────────────────────────────────
-type Section = "vouches" | "accounts" | "messages" | "comments";
+type Section = "vouches" | "kofiWall" | "accounts" | "messages" | "comments";
 
 function AdminShell() {
   const [section, setSection] = useState<Section>("vouches");
@@ -1067,6 +1498,9 @@ function AdminShell() {
         <button className={`ash-tab${section === "vouches" ? " ash-tab-active" : ""}`} onClick={() => setSection("vouches")}>
           VOUCHES
         </button>
+        <button className={`ash-tab${section === "kofiWall" ? " ash-tab-active" : ""}`} onClick={() => setSection("kofiWall")}>
+          KO-FI WALL
+        </button>
         <button className={`ash-tab${section === "accounts" ? " ash-tab-active" : ""}`} onClick={() => setSection("accounts")}>
           ACCOUNTS
         </button>
@@ -1078,6 +1512,7 @@ function AdminShell() {
         </button>
       </div>
       {section === "vouches" && <Dashboard />}
+      {section === "kofiWall" && <KofiWallPanel />}
       {section === "accounts" && <AccountsPanel />}
       {section === "messages" && <MessagesPanel />}
       {section === "comments" && <CommentsPanel />}
